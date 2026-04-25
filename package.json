@@ -1,0 +1,15 @@
+{
+  "name": "ai-interview-copilot",
+  "private": true,
+  "workspaces": [
+    "frontend",
+    "backend"
+  ],
+  "scripts": {
+    "build": "npm run build:frontend",
+    "dev:frontend": "npm --workspace frontend run dev",
+    "dev:backend": "npm --workspace backend run dev",
+    "build:frontend": "npm --workspace frontend run build",
+    "start": "npm --workspace backend run start"
+  }
+}
