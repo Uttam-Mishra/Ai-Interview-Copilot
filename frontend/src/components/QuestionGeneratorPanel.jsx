@@ -18,6 +18,9 @@ export default function QuestionGeneratorPanel({
     const nextRole = event.target.value;
 
     setRole(nextRole);
+    setQuestions([]);
+    setModelName("");
+    setErrorMessage("");
     onRoleChanged?.(nextRole);
     onQuestionsGenerated?.([]);
   }
@@ -59,12 +62,19 @@ export default function QuestionGeneratorPanel({
   }
 
   const isDisabled = isGenerating || !resumeText || !aiConfigured;
+  const panelTone = questions.length > 0 ? "ready" : aiConfigured ? "idle" : "locked";
+  const panelStatus = questions.length > 0 ? "Questions ready" : aiConfigured ? "Ready to generate" : "Demo mode";
 
   return (
     <section className="panel generator-panel">
+      <div className="panel-topline">
+        <span className="section-kicker">Step 2</span>
+        <span className={`section-badge section-badge--${panelTone}`}>{panelStatus}</span>
+      </div>
+
       <div className="panel-header">
         <h2>Question Generator</h2>
-        <p>Enter the role and generate resume-aware interview questions with AI.</p>
+        <p>Set the target role, then generate focused interview questions grounded in the uploaded resume.</p>
       </div>
 
       {!aiConfigured ? (
@@ -98,6 +108,16 @@ export default function QuestionGeneratorPanel({
 
       {errorMessage ? <p className="feedback feedback--error">{errorMessage}</p> : null}
 
+      {questions.length === 0 ? (
+        <div className="empty-state">
+          <strong>What this step produces</strong>
+          <p>
+            We’ll generate a compact set of practice questions tailored to the role,
+            skills, and project signals found in the resume.
+          </p>
+        </div>
+      ) : null}
+
       {questions.length > 0 ? (
         <div className="questions-result">
           <div className="questions-result__header">
@@ -108,6 +128,9 @@ export default function QuestionGeneratorPanel({
           <div className="questions-list">
             {questions.map((item, index) => (
               <article className="question-card" key={`${item.focus}-${index}`}>
+                <span className="question-card__index">
+                  {String(index + 1).padStart(2, "0")}
+                </span>
                 <span className="card-status">{item.focus}</span>
                 <p>{item.question}</p>
               </article>

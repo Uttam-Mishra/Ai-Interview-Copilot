@@ -36,7 +36,7 @@ export async function generateInterviewQuestions({ role, resumeText }) {
   });
 
   if (!Array.isArray(parsed?.questions) || parsed.questions.length === 0) {
-    throw new Error("OpenAI returned an invalid question payload.");
+    throw new Error("AI provider returned an invalid question payload.");
   }
 
   return {

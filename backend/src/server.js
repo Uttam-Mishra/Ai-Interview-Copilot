@@ -7,7 +7,13 @@ import { evaluateInterviewAnswer } from "./services/evaluation.service.js";
 import { generateInterviewQuestions } from "./services/questions.service.js";
 import { extractResumeText } from "./services/resume.service.js";
 
-dotenv.config();
+const currentFilePath = fileURLToPath(import.meta.url);
+const currentDirectory = dirname(currentFilePath);
+const envFilePath = resolve(currentDirectory, "../.env");
+
+dotenv.config({
+  path: envFilePath,
+});
 
 const isProduction = process.env.NODE_ENV === "production";
 const host =
@@ -16,8 +22,6 @@ const port = Number(process.env.PORT) || 4000;
 const aiModel = process.env.OPENAI_MODEL || "gpt-4o-mini";
 const maxResumeSizeBytes = 5 * 1024 * 1024;
 const maxJsonBodyBytes = 8 * 1024 * 1024;
-const currentFilePath = fileURLToPath(import.meta.url);
-const currentDirectory = dirname(currentFilePath);
 const frontendDistDirectory = resolve(currentDirectory, "../../frontend/dist");
 
 const contentTypes = {

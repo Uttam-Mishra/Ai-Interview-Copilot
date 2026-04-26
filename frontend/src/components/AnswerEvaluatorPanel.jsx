@@ -76,12 +76,26 @@ export default function AnswerEvaluatorPanel({
 
   const isDisabled =
     isEvaluating || !resumeText || !role || questions.length === 0 || !aiConfigured;
+  const panelTone = feedback ? "ready" : aiConfigured ? "idle" : "locked";
+  const panelStatus = feedback ? "Feedback ready" : aiConfigured ? "Ready to evaluate" : "Demo mode";
+  const helperMessage = !resumeText
+    ? "Upload a resume first so the evaluator has context."
+    : questions.length === 0
+      ? "Generate questions first so this evaluator has something to score."
+      : !aiConfigured
+        ? "Add the API key in production to enable real evaluation."
+        : "Pick a question and submit an answer for structured feedback.";
 
   return (
     <section className="panel evaluator-panel">
+      <div className="panel-topline">
+        <span className="section-kicker">Step 3</span>
+        <span className={`section-badge section-badge--${panelTone}`}>{panelStatus}</span>
+      </div>
+
       <div className="panel-header">
         <h2>Answer Evaluator</h2>
-        <p>Pick a generated question, write an answer, and get structured feedback.</p>
+        <p>Practice one generated question at a time and review where the answer is strong or thin.</p>
       </div>
 
       {!aiConfigured ? (
@@ -130,9 +144,10 @@ export default function AnswerEvaluatorPanel({
       </form>
 
       {isDisabled ? (
-        <p className="feedback">
-          Upload a resume and generate questions first to unlock answer evaluation.
-        </p>
+        <div className="empty-state">
+          <strong>Feedback will appear here</strong>
+          <p>{helperMessage}</p>
+        </div>
       ) : null}
 
       {errorMessage ? <p className="feedback feedback--error">{errorMessage}</p> : null}

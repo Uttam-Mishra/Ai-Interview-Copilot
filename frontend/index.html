@@ -4,9 +4,70 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>AI Interview Copilot</title>
+    <style>
+      html {
+        min-height: 100%;
+        background: linear-gradient(145deg, #07101a 0%, #122033 48%, #09121d 100%);
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        font-family: "Space Grotesk", "Avenir Next", "Segoe UI", sans-serif;
+        color: #f5efe4;
+      }
+
+      .boot-fallback {
+        display: grid;
+        place-items: center;
+        min-height: 100vh;
+        padding: 24px;
+      }
+
+      .boot-fallback__card {
+        max-width: 560px;
+        padding: 24px;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        border-radius: 24px;
+        background: rgba(10, 18, 28, 0.82);
+        box-shadow: 0 24px 70px rgba(0, 0, 0, 0.28);
+      }
+
+      .boot-fallback__eyebrow {
+        margin: 0;
+        color: #f1a55f;
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+      }
+
+      .boot-fallback__title {
+        margin: 12px 0 0;
+        font-size: 32px;
+        line-height: 1.05;
+      }
+
+      .boot-fallback__copy {
+        margin: 12px 0 0;
+        color: #c8d3df;
+        line-height: 1.6;
+      }
+    </style>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <main class="boot-fallback">
+        <section class="boot-fallback__card">
+          <p class="boot-fallback__eyebrow">Starting Frontend</p>
+          <h1 class="boot-fallback__title">AI Interview Copilot</h1>
+          <p class="boot-fallback__copy">
+            If this loading screen stays visible for more than a few seconds,
+            restart the frontend dev server and hard refresh the page.
+          </p>
+        </section>
+      </main>
+    </div>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

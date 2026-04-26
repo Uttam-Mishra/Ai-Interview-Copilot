@@ -66,7 +66,7 @@ export async function evaluateInterviewAnswer({ role, resumeText, question, answ
     !Array.isArray(parsed?.strengths) ||
     !Array.isArray(parsed?.weaknesses)
   ) {
-    throw new Error("OpenAI returned an invalid evaluation payload.");
+    throw new Error("AI provider returned an invalid evaluation payload.");
   }
 
   return {

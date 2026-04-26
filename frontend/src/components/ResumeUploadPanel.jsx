@@ -40,16 +40,30 @@ export default function ResumeUploadPanel({ onResumeExtracted }) {
     onResumeExtracted?.(null);
   }
 
+  const panelStatus = resumeResult ? "Resume ready" : selectedFile ? "Ready to extract" : "Awaiting upload";
+  const panelTone = resumeResult ? "ready" : selectedFile ? "idle" : "locked";
+
   return (
     <section className="panel upload-panel">
+      <div className="panel-topline">
+        <span className="section-kicker">Step 1</span>
+        <span className={`section-badge section-badge--${panelTone}`}>{panelStatus}</span>
+      </div>
+
       <div className="panel-header">
         <h2>Resume Upload</h2>
-        <p>Upload a PDF so we can extract the text for question generation.</p>
+        <p>Upload a candidate PDF so we can turn the raw document into usable interview context.</p>
       </div>
 
       <form className="upload-form" onSubmit={handleSubmit}>
-        <label className="file-picker" htmlFor="resume-upload">
+        <label
+          className={`file-picker ${selectedFile ? "file-picker--selected" : ""}`}
+          htmlFor="resume-upload"
+        >
           <span className="file-picker__label">Resume PDF</span>
+          <span className="file-picker__hint">
+            Text-based PDFs work best for clean extraction and stronger downstream prompts.
+          </span>
           <input
             id="resume-upload"
             type="file"
@@ -83,6 +97,10 @@ export default function ResumeUploadPanel({ onResumeExtracted }) {
               <span className="meta-label">Characters</span>
               <strong>{resumeResult.characterCount}</strong>
             </div>
+          </div>
+
+          <div className="checkpoint-banner">
+            Resume context is ready. You can move to role-based question generation now.
           </div>
 
           <div className="extracted-text">

@@ -10,6 +10,7 @@
     "dev:frontend": "npm --workspace frontend run dev",
     "dev:backend": "npm --workspace backend run dev",
     "build:frontend": "npm --workspace frontend run build",
+    "preview:local": "npm run build && PORT=4010 npm --workspace backend run start",
     "start": "npm --workspace backend run start"
   }
 }
