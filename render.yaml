@@ -8,7 +8,9 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
+      - key: OPENAI_BASE_URL
+        value: https://api.aicredits.in/v1
       - key: OPENAI_API_KEY
         sync: false
       - key: OPENAI_MODEL
-        value: gpt-4o-mini
+        value: openai/gpt-4o-mini
