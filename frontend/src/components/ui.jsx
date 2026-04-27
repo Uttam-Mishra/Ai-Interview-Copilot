@@ -27,6 +27,7 @@ export function PanelFrame({
   children,
   className,
   description,
+  headerAction,
   priority,
   status,
   statusTone = "idle",
@@ -66,6 +67,8 @@ export function PanelFrame({
             </p>
           </div>
         </div>
+
+        {headerAction ? <div className="shrink-0">{headerAction}</div> : null}
       </div>
 
       <div className="mt-6 space-y-5">{children}</div>

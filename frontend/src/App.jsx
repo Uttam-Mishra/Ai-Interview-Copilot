@@ -5,6 +5,8 @@ import ResumeUploadPanel from "./components/ResumeUploadPanel";
 import { StatusBadge, cn } from "./components/ui";
 import { getHealth } from "./lib/api";
 
+const APP_STATE_STORAGE_KEY = "ai-interview-copilot-state";
+
 const roadmap = [
   {
     title: "Foundation",
@@ -41,15 +43,57 @@ const roadmapTones = {
 };
 
 export default function App() {
-  const [generatedQuestions, setGeneratedQuestions] = useState([]);
-  const [targetRole, setTargetRole] = useState("");
-  const [resumeData, setResumeData] = useState(null);
+  const [generatedQuestions, setGeneratedQuestions] = useState(() => {
+    if (typeof window === "undefined") {
+      return [];
+    }
+
+    try {
+      const storedState = window.localStorage.getItem(APP_STATE_STORAGE_KEY);
+      const parsedState = storedState ? JSON.parse(storedState) : null;
+      return Array.isArray(parsedState?.generatedQuestions) ? parsedState.generatedQuestions : [];
+    } catch {
+      return [];
+    }
+  });
+  const [targetRole, setTargetRole] = useState(() => {
+    if (typeof window === "undefined") {
+      return "";
+    }
+
+    try {
+      const storedState = window.localStorage.getItem(APP_STATE_STORAGE_KEY);
+      const parsedState = storedState ? JSON.parse(storedState) : null;
+      return typeof parsedState?.targetRole === "string" ? parsedState.targetRole : "";
+    } catch {
+      return "";
+    }
+  });
+  const [resumeData, setResumeData] = useState(() => {
+    if (typeof window === "undefined") {
+      return null;
+    }
+
+    try {
+      const storedState = window.localStorage.getItem(APP_STATE_STORAGE_KEY);
+      const parsedState = storedState ? JSON.parse(storedState) : null;
+      return parsedState?.resumeData ?? null;
+    } catch {
+      return null;
+    }
+  });
   const [health, setHealth] = useState({
     aiConfigured: false,
     aiModel: "",
     status: "loading",
     message: "Checking backend connection...",
   });
+
+  const standaloneView =
+    typeof window !== "undefined"
+      ? new URLSearchParams(window.location.search).get("view")
+      : "";
+  const isStandaloneEvaluator = standaloneView === "evaluator";
 
   useEffect(() => {
     let isMounted = true;
@@ -92,6 +136,35 @@ export default function App() {
       isMounted = false;
     };
   }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const nextState = {
+      generatedQuestions,
+      resumeData,
+      targetRole,
+    };
+
+    window.localStorage.setItem(APP_STATE_STORAGE_KEY, JSON.stringify(nextState));
+  }, [generatedQuestions, resumeData, targetRole]);
+
+  function handleOpenEvaluatorInNewTab() {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const nextState = {
+      generatedQuestions,
+      resumeData,
+      targetRole,
+    };
+
+    window.localStorage.setItem(APP_STATE_STORAGE_KEY, JSON.stringify(nextState));
+    window.open(`${window.location.pathname}?view=evaluator`, "_blank", "noopener,noreferrer");
+  }
 
   const roleIsReady = targetRole.trim().length > 0;
   const currentStep = !resumeData
@@ -184,6 +257,50 @@ export default function App() {
             : "idle",
     },
   ];
+
+  if (isStandaloneEvaluator) {
+    return (
+      <main className="relative min-h-screen pb-14">
+        <div className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[360px] bg-[radial-gradient(circle_at_top_left,rgba(96,165,250,0.14),transparent_38%),radial-gradient(circle_at_top_right,rgba(255,255,255,0.08),transparent_32%)]" />
+
+        <div className="mx-auto flex max-w-5xl flex-col gap-6 px-4 py-5 sm:px-6 lg:px-8">
+          <header className="rounded-[28px] border border-white/10 bg-slate-950/65 px-5 py-4 shadow-[0_24px_90px_rgba(2,6,23,0.45)] backdrop-blur-xl">
+            <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+              <div className="space-y-2">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-slate-400">
+                  Standalone evaluator
+                </p>
+                <h1 className="text-2xl font-semibold tracking-[-0.04em] text-white">
+                  Answer Evaluator
+                </h1>
+                <p className="max-w-2xl text-sm leading-7 text-slate-300">
+                  This tab keeps the scoring workspace separate so you can practice one
+                  answer at a time without losing the main dashboard context.
+                </p>
+              </div>
+
+              <a
+                className="inline-flex items-center justify-center rounded-2xl border border-white/10 bg-white/[0.06] px-4 py-3 text-sm font-semibold text-slate-100 transition-all duration-300 hover:-translate-y-0.5 hover:border-white/20 hover:bg-white/[0.09]"
+                href={window.location.pathname}
+              >
+                Back to workspace
+              </a>
+            </div>
+          </header>
+
+          <AnswerEvaluatorPanel
+            aiConfigured={health.aiConfigured}
+            aiModel={health.aiModel}
+            isStandalone
+            priority
+            questions={generatedQuestions}
+            resumeText={resumeData?.text ?? ""}
+            role={targetRole.trim()}
+          />
+        </div>
+      </main>
+    );
+  }
 
   return (
     <main className="relative min-h-screen pb-14">
@@ -363,6 +480,7 @@ export default function App() {
             <AnswerEvaluatorPanel
               aiConfigured={health.aiConfigured}
               aiModel={health.aiModel}
+              onOpenInNewTab={handleOpenEvaluatorInNewTab}
               priority={currentStep === "evaluate" && health.aiConfigured}
               questions={generatedQuestions}
               resumeText={resumeData?.text ?? ""}

@@ -13,6 +13,8 @@ import {
 export default function AnswerEvaluatorPanel({
   aiConfigured,
   aiModel,
+  isStandalone = false,
+  onOpenInNewTab,
   priority = false,
   questions,
   resumeText,
@@ -103,8 +105,15 @@ export default function AnswerEvaluatorPanel({
 
   return (
     <PanelFrame
-      className="xl:sticky xl:top-6"
+      className={isStandalone ? "" : "xl:sticky xl:top-6"}
       description="This panel is designed for focused practice: one selected question, one roomy answer box, and one clear evaluation action."
+      headerAction={
+        !isStandalone ? (
+          <ActionButton className="px-4 py-2.5 text-xs" onClick={onOpenInNewTab} type="button">
+            Open in new tab
+          </ActionButton>
+        ) : null
+      }
       priority={priority}
       status={status}
       statusTone={statusTone}
