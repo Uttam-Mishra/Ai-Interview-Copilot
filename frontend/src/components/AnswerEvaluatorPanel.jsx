@@ -105,7 +105,7 @@ export default function AnswerEvaluatorPanel({
 
   return (
     <PanelFrame
-      className={isStandalone ? "" : "xl:sticky xl:top-6"}
+      className="xl:self-start"
       description="This panel is designed for focused practice: one selected question, one roomy answer box, and one clear evaluation action."
       headerAction={
         !isStandalone ? (
