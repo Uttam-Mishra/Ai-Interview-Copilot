@@ -1,10 +1,12 @@
 import { useState } from "react";
-import { uploadResume } from "../lib/api";
+import { buildResumeUploadPayload, uploadResume } from "../lib/api";
 
 export default function ResumeUploadPanel({ onResumeExtracted }) {
   const [selectedFile, setSelectedFile] = useState(null);
+  const [preparedUpload, setPreparedUpload] = useState(null);
   const [resumeResult, setResumeResult] = useState(null);
   const [errorMessage, setErrorMessage] = useState("");
+  const [isPreparing, setIsPreparing] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
 
   async function handleSubmit(event) {
@@ -15,11 +17,16 @@ export default function ResumeUploadPanel({ onResumeExtracted }) {
       return;
     }
 
+    if (!preparedUpload) {
+      setErrorMessage("Choose a readable PDF resume before uploading.");
+      return;
+    }
+
     setIsUploading(true);
     setErrorMessage("");
 
     try {
-      const data = await uploadResume(selectedFile);
+      const data = await uploadResume(preparedUpload);
       setResumeResult(data);
       onResumeExtracted?.(data);
     } catch (error) {
@@ -31,16 +38,38 @@ export default function ResumeUploadPanel({ onResumeExtracted }) {
     }
   }
 
-  function handleFileChange(event) {
+  async function handleFileChange(event) {
     const file = event.target.files?.[0] ?? null;
 
     setSelectedFile(file);
+    setPreparedUpload(null);
     setResumeResult(null);
     setErrorMessage("");
     onResumeExtracted?.(null);
+
+    if (!file) {
+      return;
+    }
+
+    setIsPreparing(true);
+
+    try {
+      const payload = await buildResumeUploadPayload(file);
+      setPreparedUpload(payload);
+    } catch (error) {
+      setErrorMessage(error.message);
+    } finally {
+      setIsPreparing(false);
+    }
   }
 
-  const panelStatus = resumeResult ? "Resume ready" : selectedFile ? "Ready to extract" : "Awaiting upload";
+  const panelStatus = resumeResult
+    ? "Resume ready"
+    : isPreparing
+      ? "Reading file"
+      : selectedFile
+        ? "Ready to extract"
+        : "Awaiting upload";
   const panelTone = resumeResult ? "ready" : selectedFile ? "idle" : "locked";
 
   return (
@@ -75,8 +104,12 @@ export default function ResumeUploadPanel({ onResumeExtracted }) {
           </span>
         </label>
 
-        <button className="primary-button" disabled={isUploading} type="submit">
-          {isUploading ? "Extracting..." : "Upload and Extract"}
+        <button
+          className="primary-button"
+          disabled={isPreparing || isUploading || !preparedUpload}
+          type="submit"
+        >
+          {isPreparing ? "Reading PDF..." : isUploading ? "Extracting..." : "Upload and Extract"}
         </button>
       </form>
 

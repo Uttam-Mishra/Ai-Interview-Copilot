@@ -33,23 +33,47 @@ async function apiGet(path) {
   return parseApiResponse(response);
 }
 
+function getFileReadErrorMessage(error) {
+  const name = error?.name ?? "";
+  const message = error?.message ?? "";
+
+  if (name === "NotReadableError" || message.includes("could not be read")) {
+    return "This PDF could not be read by the browser. Move it to a local folder like Downloads/Desktop, make sure it is fully downloaded, then reselect it.";
+  }
+
+  return "We could not read this PDF in the browser. Please choose the file again and retry.";
+}
+
 export function getHealth() {
   return apiGet("/api/health");
 }
 
-export async function uploadResume(file) {
-  const fileDataBase64 = arrayBufferToBase64(await file.arrayBuffer());
+export async function buildResumeUploadPayload(file) {
+  try {
+    const fileDataBase64 = arrayBufferToBase64(await file.arrayBuffer());
+
+    return {
+      fileDataBase64,
+      fileName: file.name,
+      mimeType: file.type,
+    };
+  } catch (error) {
+    throw new Error(getFileReadErrorMessage(error));
+  }
+}
+
+export async function uploadResume(fileOrPayload) {
+  const payload =
+    fileOrPayload?.fileDataBase64
+      ? fileOrPayload
+      : await buildResumeUploadPayload(fileOrPayload);
 
   const response = await fetch(`${API_BASE_URL}/api/resume/upload`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({
-      fileDataBase64,
-      fileName: file.name,
-      mimeType: file.type,
-    }),
+    body: JSON.stringify(payload),
   });
 
   return parseApiResponse(response);
