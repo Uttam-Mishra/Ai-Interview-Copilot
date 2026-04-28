@@ -1,8 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import AnswerEvaluatorPanel from "./components/AnswerEvaluatorPanel";
 import QuestionGeneratorPanel from "./components/QuestionGeneratorPanel";
 import ResumeUploadPanel from "./components/ResumeUploadPanel";
-import { StatusBadge, cn } from "./components/ui";
+import { ActionButton, StatusBadge, cn } from "./components/ui";
 import { getHealth } from "./lib/api";
 
 const APP_STATE_STORAGE_KEY = "ai-interview-copilot-state";
@@ -82,6 +82,21 @@ export default function App() {
       return null;
     }
   });
+  const [selectedQuestion, setSelectedQuestion] = useState(() => {
+    if (typeof window === "undefined") {
+      return "";
+    }
+
+    try {
+      const storedState = window.localStorage.getItem(APP_STATE_STORAGE_KEY);
+      const parsedState = storedState ? JSON.parse(storedState) : null;
+      return typeof parsedState?.selectedQuestion === "string"
+        ? parsedState.selectedQuestion
+        : "";
+    } catch {
+      return "";
+    }
+  });
   const [health, setHealth] = useState({
     aiConfigured: false,
     aiModel: "",
@@ -94,6 +109,9 @@ export default function App() {
       ? new URLSearchParams(window.location.search).get("view")
       : "";
   const isStandaloneEvaluator = standaloneView === "evaluator";
+  const uploadSectionRef = useRef(null);
+  const questionSectionRef = useRef(null);
+  const evaluatorSectionRef = useRef(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -145,11 +163,28 @@ export default function App() {
     const nextState = {
       generatedQuestions,
       resumeData,
+      selectedQuestion,
       targetRole,
     };
 
     window.localStorage.setItem(APP_STATE_STORAGE_KEY, JSON.stringify(nextState));
-  }, [generatedQuestions, resumeData, targetRole]);
+  }, [generatedQuestions, resumeData, selectedQuestion, targetRole]);
+
+  useEffect(() => {
+    if (generatedQuestions.length === 0) {
+      setSelectedQuestion("");
+      return;
+    }
+
+    if (
+      selectedQuestion &&
+      generatedQuestions.some((item) => item.question === selectedQuestion)
+    ) {
+      return;
+    }
+
+    setSelectedQuestion(generatedQuestions[0].question);
+  }, [generatedQuestions, selectedQuestion]);
 
   function handleOpenEvaluatorInNewTab() {
     if (typeof window === "undefined") {
@@ -159,6 +194,7 @@ export default function App() {
     const nextState = {
       generatedQuestions,
       resumeData,
+      selectedQuestion,
       targetRole,
     };
 
@@ -166,38 +202,107 @@ export default function App() {
     window.open(`${window.location.pathname}?view=evaluator`, "_blank", "noopener,noreferrer");
   }
 
+  function scrollToSection(section) {
+    const map = {
+      evaluate: evaluatorSectionRef,
+      questions: questionSectionRef,
+      upload: uploadSectionRef,
+    };
+
+    map[section]?.current?.scrollIntoView({
+      behavior: "smooth",
+      block: "start",
+    });
+  }
+
+  useEffect(() => {
+    if (!resumeData) {
+      return;
+    }
+
+    scrollToSection(health.aiConfigured ? "questions" : "upload");
+  }, [resumeData, health.aiConfigured]);
+
+  useEffect(() => {
+    if (generatedQuestions.length === 0) {
+      return;
+    }
+
+    scrollToSection("evaluate");
+  }, [generatedQuestions]);
+
   const roleIsReady = targetRole.trim().length > 0;
+  const suggestedQuestion = generatedQuestions[0] ?? null;
   const currentStep = !resumeData
     ? "upload"
     : !health.aiConfigured || generatedQuestions.length === 0
       ? "questions"
       : "evaluate";
-
-  const nextAction = !resumeData
-    ? {
+  const nextAction = useMemo(() => {
+    if (!resumeData) {
+      return {
         eyebrow: "Step 1",
-        title: "Upload a resume PDF to unlock the workflow.",
-        detail: "We will extract the most useful candidate context first, then use it to drive question generation and scoring.",
-      }
-    : !health.aiConfigured
-      ? {
-          eyebrow: "Demo mode",
-          title: "Connect the AI key to unlock question generation.",
-          detail: "Resume extraction is live. Add the production AI key when you want real question generation and answer evaluation.",
-        }
-      : generatedQuestions.length === 0
-        ? {
-            eyebrow: "Step 2",
-            title: roleIsReady
-              ? "Generate the first practice set for this role."
-              : "Define the role, then generate focused questions.",
-            detail: "Use a concise role title like Frontend Engineer, SDE Intern, or Product Analyst to guide the question mix.",
-          }
-        : {
-            eyebrow: "Step 3",
-            title: "Evaluate a practice answer while the context is fresh.",
-            detail: "Pick the strongest question, write a concise answer, and use the score plus strengths and gaps to coach the next draft.",
-          };
+        title: "Upload a resume to begin.",
+        detail:
+          "We’ll turn the resume into a quick profile snapshot before any AI actions happen.",
+        actionLabel: "Go to resume upload",
+        actionTarget: "upload",
+        checklist: [
+          "Upload one text-based PDF",
+          "Extract high-signal resume highlights",
+          "Unlock role-based question generation",
+        ],
+      };
+    }
+
+    if (!health.aiConfigured) {
+      return {
+        eyebrow: "Demo mode",
+        title: "Resume is ready. AI actions unlock after key setup.",
+        detail:
+          "You can demo the upload and summary flow now. Add the AI key to enable real generation and scoring.",
+        actionLabel: "Review resume context",
+        actionTarget: "upload",
+        checklist: [
+          "Resume summary is already mapped",
+          "Question generation needs API access",
+          "Answer scoring turns on with the same setup",
+        ],
+      };
+    }
+
+    if (generatedQuestions.length === 0) {
+      return {
+        eyebrow: "Step 2",
+        title: roleIsReady
+          ? "Generate tailored questions for this role."
+          : "Choose the role, then generate tailored questions.",
+        detail:
+          "Use a specific role title so the first practice set feels relevant instead of generic.",
+        actionLabel: "Go to question generator",
+        actionTarget: "questions",
+        checklist: [
+          "Set a clear target role",
+          "Generate five focused questions",
+          "Start with the suggested first question",
+        ],
+      };
+    }
+
+    return {
+      eyebrow: "Step 3",
+      title: "Practice the suggested question and get coaching feedback.",
+      detail:
+        "Use one concrete example in your answer so the evaluator can score relevance, clarity, and impact.",
+      actionLabel: "Go to answer evaluator",
+      actionTarget: "evaluate",
+      checklist: [
+        "Suggested first question is ready",
+        "Answer using the STAR structure",
+        "Review strengths, gaps, and next retry advice",
+      ],
+    };
+  }, [generatedQuestions.length, health.aiConfigured, resumeData, roleIsReady, suggestedQuestion]);
 
   const summaryTiles = [
     {
@@ -230,16 +335,18 @@ export default function App() {
     {
       label: "Resume upload",
       detail: resumeData ? resumeData.fileName : "Bring in candidate context",
+      statusLabel: resumeData ? "Complete" : "Current",
       tone: resumeData ? "ready" : "active",
     },
     {
       label: "Role + question set",
       detail:
         generatedQuestions.length > 0
-          ? `${generatedQuestions.length} prompts prepared`
+          ? "Suggested first question is ready"
           : roleIsReady
             ? "Ready to generate prompts"
             : "Define the target role",
+      statusLabel: generatedQuestions.length > 0 ? "Complete" : resumeData ? "Current" : "Locked",
       tone: generatedQuestions.length > 0 ? "ready" : resumeData ? "active" : "idle",
     },
     {
@@ -249,6 +356,12 @@ export default function App() {
           ? "Score the first answer"
           : "Unlocks after questions are generated"
         : "Requires AI configuration",
+      statusLabel:
+        !health.aiConfigured
+          ? "Locked"
+          : generatedQuestions.length > 0
+            ? "Current"
+            : "Pending",
       tone:
         !health.aiConfigured
           ? "locked"
@@ -292,10 +405,12 @@ export default function App() {
             aiConfigured={health.aiConfigured}
             aiModel={health.aiModel}
             isStandalone
+            onQuestionChange={setSelectedQuestion}
             priority
             questions={generatedQuestions}
             resumeText={resumeData?.text ?? ""}
             role={targetRole.trim()}
+            selectedQuestion={selectedQuestion}
           />
         </div>
       </main>
@@ -408,6 +523,26 @@ export default function App() {
 
             <p className="mt-4 text-sm leading-7 text-slate-300">{nextAction.detail}</p>
 
+            <ul className="mt-5 space-y-2 text-sm leading-7 text-slate-300">
+              {nextAction.checklist.map((item) => (
+                <li className="flex items-start gap-3" key={item}>
+                  <span className="mt-2 h-2 w-2 rounded-full bg-sky-300 shadow-[0_0_14px_rgba(125,211,252,0.4)]" />
+                  <span>{item}</span>
+                </li>
+              ))}
+            </ul>
+
+            <div className="mt-6">
+              <ActionButton
+                className="w-full sm:w-auto"
+                priority
+                onClick={() => scrollToSection(nextAction.actionTarget)}
+                type="button"
+              >
+                {nextAction.actionLabel}
+              </ActionButton>
+            </div>
+
             <div className="mt-6 grid gap-3">
               {workflowSteps.map((step, index) => (
                 <article
@@ -423,7 +558,7 @@ export default function App() {
                       <p className="text-sm leading-6 text-slate-400">{step.detail}</p>
                     </div>
 
-                    <StatusBadge tone={step.tone}>{step.tone}</StatusBadge>
+                    <StatusBadge tone={step.tone}>{step.statusLabel}</StatusBadge>
                   </div>
                 </article>
               ))}
@@ -455,75 +590,87 @@ export default function App() {
 
         <section className="grid gap-6 xl:grid-cols-[minmax(0,1.25fr)_minmax(360px,0.9fr)]">
           <div className="space-y-6">
-            <ResumeUploadPanel
-              priority={currentStep === "upload"}
-              resumeData={resumeData}
-              onResumeExtracted={(data) => {
-                setResumeData(data);
-                setGeneratedQuestions([]);
-              }}
-            />
+            <div ref={uploadSectionRef} className="scroll-mt-6">
+              <ResumeUploadPanel
+                priority={currentStep === "upload"}
+                resumeData={resumeData}
+                onResumeExtracted={(data) => {
+                  setResumeData(data);
+                  setGeneratedQuestions([]);
+                  setSelectedQuestion("");
+                }}
+              />
+            </div>
 
-            <QuestionGeneratorPanel
-              aiConfigured={health.aiConfigured}
-              aiModel={health.aiModel}
-              generatedQuestions={generatedQuestions}
-              priority={currentStep === "questions" && health.aiConfigured}
-              resumeText={resumeData?.text ?? ""}
-              role={targetRole}
-              onQuestionsGenerated={setGeneratedQuestions}
-              onRoleChanged={setTargetRole}
-            />
+            <div ref={questionSectionRef} className="scroll-mt-6 space-y-6">
+              <QuestionGeneratorPanel
+                aiConfigured={health.aiConfigured}
+                aiModel={health.aiModel}
+                generatedQuestions={generatedQuestions}
+                onJumpToEvaluate={() => scrollToSection("evaluate")}
+                onQuestionSelect={setSelectedQuestion}
+                priority={currentStep === "questions" && health.aiConfigured}
+                resumeText={resumeData?.text ?? ""}
+                role={targetRole}
+                selectedQuestion={selectedQuestion}
+                onQuestionsGenerated={setGeneratedQuestions}
+                onRoleChanged={setTargetRole}
+              />
+
+              <section className="rounded-[28px] border border-white/10 bg-white/[0.03] p-6 shadow-[0_24px_80px_rgba(2,6,23,0.4)] backdrop-blur-xl sm:p-7">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.26em] text-slate-400">
+                      Product path
+                    </p>
+                    <h3 className="mt-2 text-2xl font-semibold tracking-[-0.03em] text-white">
+                      Roadmap
+                    </h3>
+                  </div>
+
+                  <StatusBadge tone="idle">Shipping in steps</StatusBadge>
+                </div>
+
+                <div className="mt-6 space-y-3">
+                  {roadmap.map((item, index) => (
+                    <article
+                      className="rounded-2xl border border-white/10 bg-slate-950/60 p-4 transition-all duration-300 hover:border-white/15 hover:bg-slate-950/75"
+                      key={item.title}
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="space-y-2">
+                          <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">
+                            Stage {String(index + 1).padStart(2, "0")}
+                          </p>
+                          <h4 className="text-base font-semibold text-white">{item.title}</h4>
+                          <p className="text-sm leading-7 text-slate-300">{item.description}</p>
+                        </div>
+
+                        <StatusBadge tone={roadmapTones[item.status] ?? "idle"}>
+                          {item.status}
+                        </StatusBadge>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              </section>
+            </div>
           </div>
 
           <div className="space-y-6">
-            <AnswerEvaluatorPanel
-              aiConfigured={health.aiConfigured}
-              aiModel={health.aiModel}
-              onOpenInNewTab={handleOpenEvaluatorInNewTab}
-              priority={currentStep === "evaluate" && health.aiConfigured}
-              questions={generatedQuestions}
-              resumeText={resumeData?.text ?? ""}
-              role={targetRole.trim()}
-            />
-
-            <section className="rounded-[28px] border border-white/10 bg-white/[0.03] p-6 shadow-[0_24px_80px_rgba(2,6,23,0.4)] backdrop-blur-xl sm:p-7">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.26em] text-slate-400">
-                    Product path
-                  </p>
-                  <h3 className="mt-2 text-2xl font-semibold tracking-[-0.03em] text-white">
-                    Roadmap
-                  </h3>
-                </div>
-
-                <StatusBadge tone="idle">Shipping in steps</StatusBadge>
-              </div>
-
-              <div className="mt-6 space-y-3">
-                {roadmap.map((item, index) => (
-                  <article
-                    className="rounded-2xl border border-white/10 bg-slate-950/60 p-4 transition-all duration-300 hover:border-white/15 hover:bg-slate-950/75"
-                    key={item.title}
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="space-y-2">
-                        <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">
-                          Stage {String(index + 1).padStart(2, "0")}
-                        </p>
-                        <h4 className="text-base font-semibold text-white">{item.title}</h4>
-                        <p className="text-sm leading-7 text-slate-300">{item.description}</p>
-                      </div>
-
-                      <StatusBadge tone={roadmapTones[item.status] ?? "idle"}>
-                        {item.status}
-                      </StatusBadge>
-                    </div>
-                  </article>
-                ))}
-              </div>
-            </section>
+            <div ref={evaluatorSectionRef} className="scroll-mt-6">
+              <AnswerEvaluatorPanel
+                aiConfigured={health.aiConfigured}
+                aiModel={health.aiModel}
+                onQuestionChange={setSelectedQuestion}
+                onOpenInNewTab={handleOpenEvaluatorInNewTab}
+                priority={currentStep === "evaluate" && health.aiConfigured}
+                questions={generatedQuestions}
+                resumeText={resumeData?.text ?? ""}
+                role={targetRole.trim()}
+                selectedQuestion={selectedQuestion}
+              />
+            </div>
           </div>
         </section>
       </div>

@@ -32,6 +32,7 @@ export default function ResumeUploadPanel({
   priority = false,
   resumeData,
 }) {
+  const [showRawPreview, setShowRawPreview] = useState(false);
   const [selectedFile, setSelectedFile] = useState(null);
   const [preparedUpload, setPreparedUpload] = useState(null);
   const [errorMessage, setErrorMessage] = useState("");
@@ -71,6 +72,7 @@ export default function ResumeUploadPanel({
     setSelectedFile(file);
     setPreparedUpload(null);
     setErrorMessage("");
+    setShowRawPreview(false);
     onResumeExtracted?.(null);
 
     if (!file) {
@@ -253,13 +255,17 @@ export default function ResumeUploadPanel({
                   Preview highlights
                 </p>
                 <h3 className="mt-2 text-lg font-semibold text-white">
-                  Condensed resume scan for quick review
+                  Profile snapshot for quick review
                 </h3>
               </div>
 
-              <span className="text-sm text-slate-400">
-                Showing {previewChunks.length} high-signal chunks
-              </span>
+              <button
+                className="text-sm font-medium text-slate-300 transition-colors duration-300 hover:text-white"
+                type="button"
+                onClick={() => setShowRawPreview((currentValue) => !currentValue)}
+              >
+                {showRawPreview ? "Hide raw text" : "View raw extracted text"}
+              </button>
             </div>
 
             <div className="mt-5 grid gap-3">
@@ -275,6 +281,17 @@ export default function ResumeUploadPanel({
                 </article>
               ))}
             </div>
+
+            {showRawPreview ? (
+              <div className="mt-5 rounded-2xl border border-white/10 bg-slate-950/70 p-4">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">
+                  Raw extracted text
+                </p>
+                <pre className="mt-4 max-h-72 overflow-auto text-sm leading-7 text-slate-300">
+                  {resumeData.preview}
+                </pre>
+              </div>
+            ) : null}
           </div>
         </div>
       ) : (

@@ -14,11 +14,14 @@ export default function QuestionGeneratorPanel({
   aiConfigured,
   aiModel,
   generatedQuestions,
+  onJumpToEvaluate,
   onQuestionsGenerated,
+  onQuestionSelect,
   onRoleChanged,
   priority = false,
   resumeText,
   role,
+  selectedQuestion,
 }) {
   const [errorMessage, setErrorMessage] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
@@ -80,6 +83,7 @@ export default function QuestionGeneratorPanel({
 
   const hasQuestions = generatedQuestions.length > 0;
   const hasRole = role.trim().length > 0;
+  const suggestedQuestion = generatedQuestions[0] ?? null;
   const isDisabled = isGenerating || !resumeText || !aiConfigured;
   const status = hasQuestions
     ? "Questions ready"
@@ -87,6 +91,29 @@ export default function QuestionGeneratorPanel({
       ? "Ready to generate"
       : "Demo mode";
   const statusTone = hasQuestions ? "ready" : aiConfigured ? "active" : "locked";
+
+  function selectQuestion(question) {
+    onQuestionSelect?.(question);
+    onJumpToEvaluate?.();
+  }
+
+  function getQuestionReason(focus) {
+    const normalizedFocus = focus.toLowerCase();
+
+    if (normalizedFocus.includes("problem")) {
+      return "Good for showing how you think through ambiguity and debugging pressure.";
+    }
+
+    if (normalizedFocus.includes("design") || normalizedFocus.includes("ui")) {
+      return "Best when you want to show product thinking and design decisions.";
+    }
+
+    if (normalizedFocus.includes("framework") || normalizedFocus.includes("technical")) {
+      return "Useful for showing hands-on technical depth with real examples.";
+    }
+
+    return "Good starting point to connect your resume work to the target role.";
+  }
 
   return (
     <PanelFrame
@@ -209,37 +236,87 @@ export default function QuestionGeneratorPanel({
               </h3>
             </div>
             <p className="text-sm text-slate-400">
-              Pick one strong prompt and move straight into answer evaluation.
+              Start with the recommended question, then move straight into answer evaluation.
             </p>
           </div>
 
-          <div className="grid gap-3">
-            {generatedQuestions.map((item, index) => (
-              <article
-                className="rounded-[24px] border border-white/10 bg-slate-950/60 p-5 transition-all duration-300 hover:-translate-y-0.5 hover:border-white/15 hover:bg-slate-950/75"
-                key={`${item.focus}-${index}`}
-              >
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div className="space-y-2">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">
-                      Question {String(index + 1).padStart(2, "0")}
-                    </p>
-                    <StatusBadge tone="active">{item.focus}</StatusBadge>
+          {suggestedQuestion ? (
+            <article className="rounded-[28px] border border-sky-300/15 bg-sky-300/[0.08] p-5 shadow-[0_18px_50px_rgba(14,165,233,0.08)]">
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                <div className="space-y-3">
+                  <div className="flex flex-wrap items-center gap-3">
+                    <StatusBadge tone="active">Suggested first question</StatusBadge>
+                    <StatusBadge tone="idle">{suggestedQuestion.focus}</StatusBadge>
+                    {selectedQuestion === suggestedQuestion.question ? (
+                      <StatusBadge tone="ready">Selected</StatusBadge>
+                    ) : null}
                   </div>
 
-                  <div className="flex flex-wrap gap-2 text-xs text-slate-400">
-                    <span className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5">
-                      Use 1 concrete example
+                  <div className="space-y-3">
+                    <h4 className="max-w-3xl text-lg font-semibold leading-8 text-white">
+                      {suggestedQuestion.question}
+                    </h4>
+                    <p className="max-w-3xl text-sm leading-7 text-slate-300">
+                      {getQuestionReason(suggestedQuestion.focus)}
+                    </p>
+                  </div>
+
+                  <div className="flex flex-wrap gap-2 text-xs text-slate-300">
+                    <span className="rounded-full border border-white/10 bg-white/[0.05] px-3 py-1.5">
+                      Use one concrete example
                     </span>
-                    <span className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5">
+                    <span className="rounded-full border border-white/10 bg-white/[0.05] px-3 py-1.5">
+                      Mention result or impact
+                    </span>
+                    <span className="rounded-full border border-white/10 bg-white/[0.05] px-3 py-1.5">
                       Tie back to {role.trim()}
                     </span>
                   </div>
                 </div>
 
-                <p className="mt-5 max-w-3xl text-base leading-8 text-slate-100">
-                  {item.question}
-                </p>
+                <ActionButton
+                  className="min-w-[190px] self-start"
+                  priority
+                  type="button"
+                  onClick={() => selectQuestion(suggestedQuestion.question)}
+                >
+                  Practice this question
+                </ActionButton>
+              </div>
+            </article>
+          ) : null}
+
+          <div className="grid gap-3">
+            {generatedQuestions.slice(1).map((item, index) => (
+              <article
+                className="rounded-[24px] border border-white/10 bg-slate-950/60 p-5 transition-all duration-300 hover:-translate-y-0.5 hover:border-white/15 hover:bg-slate-950/75"
+                key={`${item.focus}-${index + 1}`}
+              >
+                <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                  <div className="space-y-3">
+                    <div className="flex flex-wrap items-center gap-3">
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">
+                        Question {String(index + 2).padStart(2, "0")}
+                      </p>
+                      <StatusBadge tone="idle">{item.focus}</StatusBadge>
+                      {selectedQuestion === item.question ? (
+                        <StatusBadge tone="ready">Selected</StatusBadge>
+                      ) : null}
+                    </div>
+
+                    <p className="max-w-3xl text-base leading-8 text-slate-100">
+                      {item.question}
+                    </p>
+
+                    <p className="max-w-2xl text-sm leading-7 text-slate-400">
+                      {getQuestionReason(item.focus)}
+                    </p>
+                  </div>
+
+                  <ActionButton type="button" onClick={() => selectQuestion(item.question)}>
+                    Practice this question
+                  </ActionButton>
+                </div>
               </article>
             ))}
           </div>

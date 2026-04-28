@@ -15,12 +15,13 @@ export default function AnswerEvaluatorPanel({
   aiModel,
   isStandalone = false,
   onOpenInNewTab,
+  onQuestionChange,
   priority = false,
   questions,
   resumeText,
   role,
+  selectedQuestion,
 }) {
-  const [selectedQuestion, setSelectedQuestion] = useState("");
   const [answer, setAnswer] = useState("");
   const [feedback, setFeedback] = useState(null);
   const [modelName, setModelName] = useState("");
@@ -29,7 +30,7 @@ export default function AnswerEvaluatorPanel({
 
   useEffect(() => {
     if (questions.length === 0) {
-      setSelectedQuestion("");
+      onQuestionChange?.("");
       setAnswer("");
       setFeedback(null);
       setModelName("");
@@ -37,14 +38,12 @@ export default function AnswerEvaluatorPanel({
       return;
     }
 
-    setSelectedQuestion((currentValue) => {
-      if (currentValue && questions.some((item) => item.question === currentValue)) {
-        return currentValue;
-      }
+    if (selectedQuestion && questions.some((item) => item.question === selectedQuestion)) {
+      return;
+    }
 
-      return questions[0].question;
-    });
-  }, [questions]);
+    onQuestionChange?.(questions[0].question);
+  }, [onQuestionChange, questions, selectedQuestion]);
 
   async function handleSubmit(event) {
     event.preventDefault();
@@ -87,6 +86,7 @@ export default function AnswerEvaluatorPanel({
   }
 
   const hasQuestions = questions.length > 0;
+  const currentQuestion = selectedQuestion ?? "";
   const isDisabled =
     isEvaluating || !resumeText || !role || !hasQuestions || !aiConfigured;
   const status = feedback
@@ -99,9 +99,21 @@ export default function AnswerEvaluatorPanel({
     ? "Upload a resume first so the evaluator has context."
     : !hasQuestions
       ? "Generate a question set first so this panel has something to score."
-      : !aiConfigured
+        : !aiConfigured
         ? "Add the API key in production to enable real evaluation."
         : "Choose one question, write a concise answer, and submit it for structured feedback.";
+  const topStrength = feedback?.strengths?.[0] ?? "";
+  const topWeakness = feedback?.weaknesses?.[0] ?? "";
+  const feedbackSummary = feedback
+    ? feedback.score >= 8
+      ? "Strong answer overall. Keep the clarity and tighten the proof with one more measurable outcome."
+      : feedback.score >= 6
+        ? "Good direction, but the answer needs sharper structure or a clearer result to feel interview-ready."
+        : "The answer shows intent, but it needs a more concrete example and a stronger result statement."
+    : "";
+  const retryHint = topWeakness
+    ? `Try your next version by directly fixing this first: ${topWeakness}`
+    : "Try one more version using a clearer STAR structure.";
 
   return (
     <PanelFrame
@@ -135,8 +147,8 @@ export default function AnswerEvaluatorPanel({
               id="question-select"
               className="w-full appearance-none border-0 bg-transparent text-sm leading-7 text-white outline-none disabled:text-slate-500"
               disabled={!hasQuestions}
-              value={selectedQuestion}
-              onChange={(event) => setSelectedQuestion(event.target.value)}
+              value={currentQuestion}
+              onChange={(event) => onQuestionChange?.(event.target.value)}
             >
               {!hasQuestions ? <option value="">Generate questions first</option> : null}
 
@@ -153,9 +165,24 @@ export default function AnswerEvaluatorPanel({
           <div className="space-y-1">
             <span className="text-sm font-medium text-slate-200">Your answer</span>
             <p className="text-sm leading-7 text-slate-400">
-              Keep it concrete. One clear example usually scores better than a broad,
-              generic explanation.
+              Use STAR: situation, task, action, result. One specific example usually scores
+              better than a broad, generic answer.
             </p>
+          </div>
+
+          <div className="flex flex-wrap gap-2 text-xs text-slate-300">
+            <span className="rounded-full border border-white/10 bg-white/[0.05] px-3 py-1.5">
+              Situation
+            </span>
+            <span className="rounded-full border border-white/10 bg-white/[0.05] px-3 py-1.5">
+              Task
+            </span>
+            <span className="rounded-full border border-white/10 bg-white/[0.05] px-3 py-1.5">
+              Action
+            </span>
+            <span className="rounded-full border border-white/10 bg-white/[0.05] px-3 py-1.5">
+              Result
+            </span>
           </div>
 
           <FieldShell className="p-0">
@@ -163,7 +190,7 @@ export default function AnswerEvaluatorPanel({
               id="answer-input"
               className="min-h-[230px] w-full resize-y rounded-2xl border-0 bg-transparent px-4 py-4 text-sm leading-7 text-white outline-none placeholder:text-slate-500"
               placeholder={
-                "Example:\nI would answer this using a recent project. First I would explain the context, then the actions I owned, and finally the outcome with numbers or impact."
+                "Example:\nSituation: In my recent frontend project...\nTask: I was responsible for...\nAction: I improved it by...\nResult: This reduced load time / improved usability / increased adoption..."
               }
               value={answer}
               onChange={(event) => setAnswer(event.target.value)}
@@ -252,6 +279,35 @@ export default function AnswerEvaluatorPanel({
             </div>
           </div>
 
+          <InfoBanner>
+            <div className="space-y-2">
+              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
+                Overall feedback
+              </p>
+              <p className="text-sm leading-7 text-slate-100">{feedbackSummary}</p>
+            </div>
+          </InfoBanner>
+
+          <div className="grid gap-4 lg:grid-cols-2">
+            <section className="rounded-[24px] border border-emerald-300/12 bg-emerald-300/[0.08] p-5">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-emerald-100/80">
+                Strongest part
+              </p>
+              <p className="mt-3 text-base font-semibold leading-8 text-white">
+                {topStrength || "The answer had a clear positive signal."}
+              </p>
+            </section>
+
+            <section className="rounded-[24px] border border-amber-300/12 bg-amber-300/[0.08] p-5">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-amber-100/80">
+                Improve first
+              </p>
+              <p className="mt-3 text-base font-semibold leading-8 text-white">
+                {topWeakness || "Add one stronger example and a clearer result."}
+              </p>
+            </section>
+          </div>
+
           <div className="grid gap-4 md:grid-cols-2">
             <section className="rounded-[24px] border border-white/10 bg-slate-950/60 p-5">
               <div className="flex items-center justify-between gap-3">
@@ -283,6 +339,15 @@ export default function AnswerEvaluatorPanel({
               </ul>
             </section>
           </div>
+
+          <InfoBanner tone="success">
+            <div className="space-y-2">
+              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-emerald-100/80">
+                Try this next
+              </p>
+              <p className="text-sm leading-7 text-emerald-50">{retryHint}</p>
+            </div>
+          </InfoBanner>
         </div>
       ) : null}
     </PanelFrame>
