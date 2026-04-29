@@ -129,6 +129,12 @@ pre {
   animation: interviewer-speaking-pulse 2.6s ease-in-out infinite;
 }
 
+.room-vignette {
+  background:
+    radial-gradient(circle at 50% 40%, transparent 0%, rgba(2, 4, 11, 0.2) 48%, rgba(2, 4, 11, 0.78) 100%),
+    linear-gradient(135deg, rgba(127, 29, 29, 0.18), transparent 34%, rgba(14, 116, 144, 0.12));
+}
+
 ::-webkit-scrollbar {
   width: 10px;
   height: 10px;

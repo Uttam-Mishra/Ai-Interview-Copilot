@@ -10,9 +10,8 @@ import {
   isBrutalMode,
   normalizeInterviewMode,
 } from "./lib/interviewModes";
+import { APP_STATE_STORAGE_KEY, writeStoredAppState } from "./lib/appState";
 import { getHealth } from "./lib/api";
-
-const APP_STATE_STORAGE_KEY = "ai-interview-copilot-state";
 
 const roadmap = [
   {
@@ -188,7 +187,7 @@ export default function App() {
       targetRole,
     };
 
-    window.localStorage.setItem(APP_STATE_STORAGE_KEY, JSON.stringify(nextState));
+    writeStoredAppState(nextState);
   }, [generatedQuestions, interviewMode, resumeData, selectedQuestion, targetRole]);
 
   useEffect(() => {
@@ -220,13 +219,21 @@ export default function App() {
       targetRole,
     };
 
-    window.localStorage.setItem(APP_STATE_STORAGE_KEY, JSON.stringify(nextState));
+    writeStoredAppState(nextState);
     window.open(`${window.location.pathname}?view=evaluator`, "_blank", "noopener,noreferrer");
   }
 
   function handleModeChange(nextMode) {
     const normalizedMode = normalizeInterviewMode(nextMode);
+    const nextState = {
+      generatedQuestions: [],
+      interviewMode: normalizedMode,
+      resumeData,
+      selectedQuestion: "",
+      targetRole,
+    };
 
+    writeStoredAppState(nextState);
     setInterviewMode(normalizedMode);
     setGeneratedQuestions([]);
     setSelectedQuestion("");

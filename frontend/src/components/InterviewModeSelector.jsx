@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { INTERVIEW_MODE_OPTIONS, INTERVIEW_MODES, getInterviewModeOption, isBrutalMode } from "../lib/interviewModes";
 import ModeCard from "./ModeCard";
 import { ActionButton, ModalFrame, PanelFrame, StatusBadge, cn } from "./ui";
@@ -22,6 +23,7 @@ function buildModeDisplay(option) {
 }
 
 export default function InterviewModeSelector({ mode, onModeChange }) {
+  const navigate = useNavigate();
   const [isWarningOpen, setIsWarningOpen] = useState(false);
   const [pendingMode, setPendingMode] = useState(null);
   const activeModeOption = useMemo(() => getInterviewModeOption(mode), [mode]);
@@ -53,6 +55,10 @@ export default function InterviewModeSelector({ mode, onModeChange }) {
 
     setPendingMode(null);
     setIsWarningOpen(false);
+
+    if (pendingMode === INTERVIEW_MODES.BRUTAL) {
+      navigate("/brutal-interview");
+    }
   }
 
   return (
@@ -181,7 +187,7 @@ export default function InterviewModeSelector({ mode, onModeChange }) {
               type="button"
               onClick={handleConfirm}
             >
-              Continue 🔥
+              Enter Brutal Mode Interview
             </ActionButton>
           </div>
         </div>

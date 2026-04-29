@@ -1,9 +1,7 @@
 import { useEffect, useState } from "react";
-import { useBrutalInterviewRuntime } from "../hooks/useBrutalInterviewRuntime";
+import { Link } from "react-router-dom";
 import { evaluateAnswer } from "../lib/api";
 import { getInterviewModeOption, isBrutalMode } from "../lib/interviewModes";
-import BrutalRuntimePanel from "./BrutalRuntimePanel";
-import VirtualInterviewRoom from "./VirtualInterviewRoom";
 import {
   ActionButton,
   EmptyState,
@@ -32,27 +30,8 @@ export default function AnswerEvaluatorPanel({
   const [modelName, setModelName] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
   const [isEvaluating, setIsEvaluating] = useState(false);
-  const [roomMetrics, setRoomMetrics] = useState({
-    attentionMessage: "Camera is off.",
-    eyeContactScore: 10,
-    lookAwayEvents: 0,
-  });
   const brutalModeActive = isBrutalMode(mode);
   const hasQuestions = questions.length > 0;
-
-  function appendVoiceTranscript(transcript) {
-    setAnswer((currentAnswer) => {
-      const separator = currentAnswer.trim() ? " " : "";
-      return `${currentAnswer}${separator}${transcript}`.trimStart();
-    });
-  }
-
-  const brutalRuntime = useBrutalInterviewRuntime({
-    answer,
-    enabled: brutalModeActive && hasQuestions,
-    onTranscript: appendVoiceTranscript,
-    selectedQuestion,
-  });
 
   useEffect(() => {
     if (questions.length === 0) {
@@ -114,10 +93,97 @@ export default function AnswerEvaluatorPanel({
 
   const currentQuestion = selectedQuestion ?? "";
   const modeOption = getInterviewModeOption(mode);
-  const questionLocked =
-    brutalModeActive &&
-    hasQuestions &&
-    (answer.trim().length > 0 || brutalRuntime.elapsedSeconds > 0);
+
+  if (brutalModeActive) {
+    return (
+      <PanelFrame
+        className="xl:self-start border-rose-300/15 bg-[linear-gradient(180deg,rgba(50,13,25,0.5),rgba(15,23,42,0.62))]"
+        description="Brutal Mode now runs in a separate fullscreen interview room. The dashboard stays clean while the live camera, timer, panel pressure, and No Mercy Report happen on the dedicated route."
+        headerAction={
+          !isStandalone ? (
+            <Link
+              className="inline-flex items-center justify-center rounded-2xl border border-rose-300/20 bg-rose-400/12 px-4 py-2.5 text-xs font-semibold text-rose-50 transition-all duration-300 hover:-translate-y-0.5 hover:border-rose-300/35 hover:bg-rose-400/18"
+              to="/brutal-interview"
+            >
+              Enter Brutal Room
+            </Link>
+          ) : null
+        }
+        priority={priority}
+        status={hasQuestions ? "Ready to launch" : "Prep recommended"}
+        statusTone={hasQuestions ? "locked" : "active"}
+        step="Step 3"
+        title="Brutal Mode Interview"
+      >
+        <InfoBanner tone="warning">
+          Brutal Mode no longer lives inside this dashboard. Launch the fullscreen room for
+          the real interview simulation experience.
+        </InfoBanner>
+
+        <section className="relative overflow-hidden rounded-[28px] border border-rose-300/15 bg-[radial-gradient(circle_at_20%_0%,rgba(251,113,133,0.16),transparent_32%),linear-gradient(135deg,rgba(15,23,42,0.95),rgba(8,13,24,0.98))] p-5 shadow-[0_24px_90px_rgba(127,29,29,0.18)]">
+          <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-rose-200/30 to-transparent" />
+
+          <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+            <div className="space-y-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <StatusBadge tone="locked">{modeOption.shortLabel}</StatusBadge>
+                <StatusBadge tone={hasQuestions ? "ready" : "idle"}>
+                  {hasQuestions ? "Question ready" : "Question fallback available"}
+                </StatusBadge>
+              </div>
+              <div className="space-y-2">
+                <h3 className="text-2xl font-semibold tracking-[-0.04em] text-white">
+                  Enter the dedicated interview room.
+                </h3>
+                <p className="max-w-2xl text-sm leading-7 text-slate-300">
+                  Fullscreen camera stage, active interviewer panel, timer pressure,
+                  mic controls, and an exit flow that turns into a No Mercy Report.
+                </p>
+              </div>
+            </div>
+
+            <Link
+              className="inline-flex items-center justify-center rounded-2xl bg-[linear-gradient(135deg,#fb7185,#f97316)] px-5 py-3 text-sm font-semibold text-white shadow-[0_20px_60px_rgba(244,63,94,0.32)] transition-all duration-300 hover:-translate-y-0.5 hover:scale-[1.01] hover:shadow-[0_24px_75px_rgba(249,115,22,0.38)]"
+              to="/brutal-interview"
+            >
+              Enter Brutal Mode Interview
+            </Link>
+          </div>
+
+          <div className="mt-6 grid gap-3 md:grid-cols-3">
+            <article className="rounded-2xl border border-white/10 bg-black/25 p-4">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">
+                Target role
+              </p>
+              <p className="mt-3 text-base font-semibold text-white">
+                {role || "Role not selected"}
+              </p>
+            </article>
+
+            <article className="rounded-2xl border border-white/10 bg-black/25 p-4">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">
+                Opening question
+              </p>
+              <p className="mt-3 max-h-12 overflow-hidden text-sm font-semibold leading-6 text-white">
+                {currentQuestion || "Fallback pressure question will be used."}
+              </p>
+            </article>
+
+            <article className="rounded-2xl border border-white/10 bg-black/25 p-4">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">
+                Room systems
+              </p>
+              <p className="mt-3 text-sm font-semibold leading-6 text-white">
+                Webcam, voice, timer, panel, report
+              </p>
+            </article>
+          </div>
+        </section>
+      </PanelFrame>
+    );
+  }
+
+  const questionLocked = false;
   const isDisabled =
     isEvaluating || !resumeText || !role || !hasQuestions || !aiConfigured;
   const status = feedback
@@ -135,16 +201,6 @@ export default function AnswerEvaluatorPanel({
         : "Choose one question, write a concise answer, and submit it for structured feedback.";
   const topStrength = feedback?.strengths?.[0] ?? "";
   const topWeakness = feedback?.weaknesses?.[0] ?? "";
-  const clarityScore = Math.max(
-    1,
-    Math.min(
-      10,
-      10 -
-        (brutalRuntime.analysis.fillerCount >= 3 ? 2 : 0) -
-        (brutalRuntime.analysis.wordCount > 0 && brutalRuntime.analysis.wordCount < 35 ? 2 : 0) -
-        (brutalRuntime.analysis.wordCount > 180 ? 2 : 0),
-    ),
-  );
   const feedbackSummary = feedback
     ? feedback.score >= 8
       ? "Strong answer overall. Keep the clarity and tighten the proof with one more measurable outcome."
@@ -178,37 +234,6 @@ export default function AnswerEvaluatorPanel({
           AI evaluation is currently disabled. Add <code>OPENAI_API_KEY</code> to the
           backend to enable this panel{aiModel ? ` with ${aiModel}` : ""}.
         </InfoBanner>
-      ) : null}
-
-      {brutalModeActive ? (
-        <InfoBanner tone="warning">
-          Brutal Mode is active. The question locks once the timer starts, voice input is
-          analyzed live, and the feedback tone becomes stricter.
-        </InfoBanner>
-      ) : null}
-
-      {brutalModeActive && hasQuestions ? (
-        <VirtualInterviewRoom
-          analysis={brutalRuntime.analysis}
-          enabled={brutalModeActive && hasQuestions}
-          isListening={brutalRuntime.isListening}
-          lastInterruption={brutalRuntime.lastInterruption}
-          onMetricsChange={setRoomMetrics}
-        />
-      ) : null}
-
-      {brutalModeActive && hasQuestions ? (
-        <BrutalRuntimePanel
-          analysis={brutalRuntime.analysis}
-          interimTranscript={brutalRuntime.interimTranscript}
-          isListening={brutalRuntime.isListening}
-          lastInterruption={brutalRuntime.lastInterruption}
-          timeRemaining={brutalRuntime.timeRemaining}
-          voiceError={brutalRuntime.voiceError}
-          voiceSupported={brutalRuntime.voiceSupported}
-          onStartListening={brutalRuntime.startListening}
-          onStopListening={brutalRuntime.stopListening}
-        />
       ) : null}
 
       <form className="space-y-5" onSubmit={handleSubmit}>
@@ -272,9 +297,7 @@ export default function AnswerEvaluatorPanel({
 
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex flex-wrap items-center gap-2 text-sm text-slate-400">
-            <StatusBadge tone={isBrutalMode(mode) ? "locked" : "ready"}>
-              {modeOption.shortLabel}
-            </StatusBadge>
+            <StatusBadge tone="ready">{modeOption.shortLabel}</StatusBadge>
             {questionLocked ? <StatusBadge tone="locked">No retries</StatusBadge> : null}
             <StatusBadge tone={hasQuestions ? "ready" : "idle"}>
               {hasQuestions ? "Question selected" : "Question pending"}
@@ -336,10 +359,10 @@ export default function AnswerEvaluatorPanel({
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-400">
-                  {brutalModeActive ? "No Mercy Report" : "Evaluation result"}
+                  Evaluation result
                 </p>
                 <h3 className="mt-2 text-lg font-semibold text-white">
-                  {brutalModeActive ? "Why this answer would struggle" : "Structured coaching feedback"}
+                  Structured coaching feedback
                 </h3>
               </div>
 
@@ -358,54 +381,11 @@ export default function AnswerEvaluatorPanel({
           <InfoBanner>
             <div className="space-y-2">
               <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
-                {brutalModeActive ? "Rejection risk summary" : "Overall feedback"}
+                Overall feedback
               </p>
               <p className="text-sm leading-7 text-slate-100">{feedbackSummary}</p>
             </div>
           </InfoBanner>
-
-          {brutalModeActive ? (
-            <div className="grid gap-4 md:grid-cols-3">
-              <section className="rounded-[24px] border border-rose-300/15 bg-rose-400/[0.08] p-5">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-rose-100/80">
-                  Eye contact score
-                </p>
-                <p className="mt-3 text-2xl font-semibold text-white">
-                  {roomMetrics.eyeContactScore.toFixed(1)}
-                  <span className="text-base text-slate-400">/10</span>
-                </p>
-                <p className="mt-3 text-sm leading-7 text-rose-50/80">
-                  {roomMetrics.lookAwayEvents} look-away events detected.
-                </p>
-              </section>
-
-              <section className="rounded-[24px] border border-orange-300/15 bg-orange-400/[0.08] p-5">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-orange-100/80">
-                  Confidence score
-                </p>
-                <p className="mt-3 text-2xl font-semibold text-white">
-                  {brutalRuntime.analysis.confidenceScore}
-                  <span className="text-base text-slate-400">/10</span>
-                </p>
-                <p className="mt-3 text-sm leading-7 text-orange-50/80">
-                  {brutalRuntime.analysis.fillerCount} filler words detected.
-                </p>
-              </section>
-
-              <section className="rounded-[24px] border border-sky-300/15 bg-sky-300/[0.08] p-5">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-sky-100/80">
-                  Clarity score
-                </p>
-                <p className="mt-3 text-2xl font-semibold text-white">
-                  {clarityScore}
-                  <span className="text-base text-slate-400">/10</span>
-                </p>
-                <p className="mt-3 text-sm leading-7 text-sky-50/80">
-                  {roomMetrics.attentionMessage}
-                </p>
-              </section>
-            </div>
-          ) : null}
 
           <div className="grid gap-4 lg:grid-cols-2">
             <section className="rounded-[24px] border border-emerald-300/12 bg-emerald-300/[0.08] p-5">
@@ -431,9 +411,7 @@ export default function AnswerEvaluatorPanel({
             <section className="rounded-[24px] border border-white/10 bg-slate-950/60 p-5">
               <div className="flex items-center justify-between gap-3">
                 <h4 className="text-base font-semibold text-white">Strengths</h4>
-                <StatusBadge tone="ready">
-                  {brutalModeActive ? "Improvements" : "Keep"}
-                </StatusBadge>
+                <StatusBadge tone="ready">Keep</StatusBadge>
               </div>
               <ul className="mt-4 space-y-3">
                 {feedback.strengths.map((item) => (
@@ -448,9 +426,7 @@ export default function AnswerEvaluatorPanel({
             <section className="rounded-[24px] border border-white/10 bg-slate-950/60 p-5">
               <div className="flex items-center justify-between gap-3">
                 <h4 className="text-base font-semibold text-white">Weaknesses</h4>
-                <StatusBadge tone="locked">
-                  {brutalModeActive ? "Mistakes" : "Improve"}
-                </StatusBadge>
+                <StatusBadge tone="locked">Improve</StatusBadge>
               </div>
               <ul className="mt-4 space-y-3">
                 {feedback.weaknesses.map((item) => (

@@ -1,6 +1,8 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
+import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import App from "./App";
+import BrutalInterviewPage from "./pages/BrutalInterviewPage";
 import "./styles.css";
 
 const rootElement = document.getElementById("root");
@@ -116,7 +118,13 @@ window.addEventListener("unhandledrejection", (event) => {
 root.render(
   <React.StrictMode>
     <AppErrorBoundary>
-      <App />
+      <BrowserRouter>
+        <Routes>
+          <Route path="/" element={<App />} />
+          <Route path="/brutal-interview" element={<BrutalInterviewPage />} />
+          <Route path="*" element={<Navigate replace to="/" />} />
+        </Routes>
+      </BrowserRouter>
     </AppErrorBoundary>
   </React.StrictMode>,
 );
