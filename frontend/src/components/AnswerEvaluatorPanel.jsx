@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
+import { useBrutalInterviewRuntime } from "../hooks/useBrutalInterviewRuntime";
 import { evaluateAnswer } from "../lib/api";
 import { getInterviewModeOption, isBrutalMode } from "../lib/interviewModes";
+import BrutalRuntimePanel from "./BrutalRuntimePanel";
 import {
   ActionButton,
   EmptyState,
@@ -29,6 +31,22 @@ export default function AnswerEvaluatorPanel({
   const [modelName, setModelName] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
   const [isEvaluating, setIsEvaluating] = useState(false);
+  const brutalModeActive = isBrutalMode(mode);
+  const hasQuestions = questions.length > 0;
+
+  function appendVoiceTranscript(transcript) {
+    setAnswer((currentAnswer) => {
+      const separator = currentAnswer.trim() ? " " : "";
+      return `${currentAnswer}${separator}${transcript}`.trimStart();
+    });
+  }
+
+  const brutalRuntime = useBrutalInterviewRuntime({
+    answer,
+    enabled: brutalModeActive && hasQuestions,
+    onTranscript: appendVoiceTranscript,
+    selectedQuestion,
+  });
 
   useEffect(() => {
     if (questions.length === 0) {
@@ -88,9 +106,12 @@ export default function AnswerEvaluatorPanel({
     }
   }
 
-  const hasQuestions = questions.length > 0;
   const currentQuestion = selectedQuestion ?? "";
   const modeOption = getInterviewModeOption(mode);
+  const questionLocked =
+    brutalModeActive &&
+    hasQuestions &&
+    (answer.trim().length > 0 || brutalRuntime.elapsedSeconds > 0);
   const isDisabled =
     isEvaluating || !resumeText || !role || !hasQuestions || !aiConfigured;
   const status = feedback
@@ -143,11 +164,25 @@ export default function AnswerEvaluatorPanel({
         </InfoBanner>
       ) : null}
 
-      {isBrutalMode(mode) ? (
+      {brutalModeActive ? (
         <InfoBanner tone="warning">
-          Brutal Mode is selected. This evaluator now carries the mode flag safely, while
-          timers, no-retry rules, and deeper rejection reporting land in the next step.
+          Brutal Mode is active. The question locks once the timer starts, voice input is
+          analyzed live, and the feedback tone becomes stricter.
         </InfoBanner>
+      ) : null}
+
+      {brutalModeActive && hasQuestions ? (
+        <BrutalRuntimePanel
+          analysis={brutalRuntime.analysis}
+          interimTranscript={brutalRuntime.interimTranscript}
+          isListening={brutalRuntime.isListening}
+          lastInterruption={brutalRuntime.lastInterruption}
+          timeRemaining={brutalRuntime.timeRemaining}
+          voiceError={brutalRuntime.voiceError}
+          voiceSupported={brutalRuntime.voiceSupported}
+          onStartListening={brutalRuntime.startListening}
+          onStopListening={brutalRuntime.stopListening}
+        />
       ) : null}
 
       <form className="space-y-5" onSubmit={handleSubmit}>
@@ -157,7 +192,7 @@ export default function AnswerEvaluatorPanel({
             <select
               id="question-select"
               className="w-full appearance-none border-0 bg-transparent text-sm leading-7 text-white outline-none disabled:text-slate-500"
-              disabled={!hasQuestions}
+              disabled={!hasQuestions || questionLocked}
               value={currentQuestion}
               onChange={(event) => onQuestionChange?.(event.target.value)}
             >
@@ -214,6 +249,7 @@ export default function AnswerEvaluatorPanel({
             <StatusBadge tone={isBrutalMode(mode) ? "locked" : "ready"}>
               {modeOption.shortLabel}
             </StatusBadge>
+            {questionLocked ? <StatusBadge tone="locked">No retries</StatusBadge> : null}
             <StatusBadge tone={hasQuestions ? "ready" : "idle"}>
               {hasQuestions ? "Question selected" : "Question pending"}
             </StatusBadge>
@@ -274,10 +310,10 @@ export default function AnswerEvaluatorPanel({
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-400">
-                  Evaluation result
+                  {brutalModeActive ? "No Mercy Report" : "Evaluation result"}
                 </p>
                 <h3 className="mt-2 text-lg font-semibold text-white">
-                  Structured coaching feedback
+                  {brutalModeActive ? "Why this answer would struggle" : "Structured coaching feedback"}
                 </h3>
               </div>
 
@@ -326,7 +362,9 @@ export default function AnswerEvaluatorPanel({
             <section className="rounded-[24px] border border-white/10 bg-slate-950/60 p-5">
               <div className="flex items-center justify-between gap-3">
                 <h4 className="text-base font-semibold text-white">Strengths</h4>
-                <StatusBadge tone="ready">Keep</StatusBadge>
+                <StatusBadge tone="ready">
+                  {brutalModeActive ? "Improvements" : "Keep"}
+                </StatusBadge>
               </div>
               <ul className="mt-4 space-y-3">
                 {feedback.strengths.map((item) => (
@@ -341,7 +379,9 @@ export default function AnswerEvaluatorPanel({
             <section className="rounded-[24px] border border-white/10 bg-slate-950/60 p-5">
               <div className="flex items-center justify-between gap-3">
                 <h4 className="text-base font-semibold text-white">Weaknesses</h4>
-                <StatusBadge tone="locked">Improve</StatusBadge>
+                <StatusBadge tone="locked">
+                  {brutalModeActive ? "Mistakes" : "Improve"}
+                </StatusBadge>
               </div>
               <ul className="mt-4 space-y-3">
                 {feedback.weaknesses.map((item) => (
