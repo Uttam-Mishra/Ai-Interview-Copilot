@@ -3,6 +3,7 @@ import { useBrutalInterviewRuntime } from "../hooks/useBrutalInterviewRuntime";
 import { evaluateAnswer } from "../lib/api";
 import { getInterviewModeOption, isBrutalMode } from "../lib/interviewModes";
 import BrutalRuntimePanel from "./BrutalRuntimePanel";
+import VirtualInterviewRoom from "./VirtualInterviewRoom";
 import {
   ActionButton,
   EmptyState,
@@ -31,6 +32,11 @@ export default function AnswerEvaluatorPanel({
   const [modelName, setModelName] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
   const [isEvaluating, setIsEvaluating] = useState(false);
+  const [roomMetrics, setRoomMetrics] = useState({
+    attentionMessage: "Camera is off.",
+    eyeContactScore: 10,
+    lookAwayEvents: 0,
+  });
   const brutalModeActive = isBrutalMode(mode);
   const hasQuestions = questions.length > 0;
 
@@ -129,6 +135,16 @@ export default function AnswerEvaluatorPanel({
         : "Choose one question, write a concise answer, and submit it for structured feedback.";
   const topStrength = feedback?.strengths?.[0] ?? "";
   const topWeakness = feedback?.weaknesses?.[0] ?? "";
+  const clarityScore = Math.max(
+    1,
+    Math.min(
+      10,
+      10 -
+        (brutalRuntime.analysis.fillerCount >= 3 ? 2 : 0) -
+        (brutalRuntime.analysis.wordCount > 0 && brutalRuntime.analysis.wordCount < 35 ? 2 : 0) -
+        (brutalRuntime.analysis.wordCount > 180 ? 2 : 0),
+    ),
+  );
   const feedbackSummary = feedback
     ? feedback.score >= 8
       ? "Strong answer overall. Keep the clarity and tighten the proof with one more measurable outcome."
@@ -169,6 +185,15 @@ export default function AnswerEvaluatorPanel({
           Brutal Mode is active. The question locks once the timer starts, voice input is
           analyzed live, and the feedback tone becomes stricter.
         </InfoBanner>
+      ) : null}
+
+      {brutalModeActive && hasQuestions ? (
+        <VirtualInterviewRoom
+          analysis={brutalRuntime.analysis}
+          enabled={brutalModeActive && hasQuestions}
+          lastInterruption={brutalRuntime.lastInterruption}
+          onMetricsChange={setRoomMetrics}
+        />
       ) : null}
 
       {brutalModeActive && hasQuestions ? (
@@ -332,11 +357,54 @@ export default function AnswerEvaluatorPanel({
           <InfoBanner>
             <div className="space-y-2">
               <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
-                Overall feedback
+                {brutalModeActive ? "Rejection risk summary" : "Overall feedback"}
               </p>
               <p className="text-sm leading-7 text-slate-100">{feedbackSummary}</p>
             </div>
           </InfoBanner>
+
+          {brutalModeActive ? (
+            <div className="grid gap-4 md:grid-cols-3">
+              <section className="rounded-[24px] border border-rose-300/15 bg-rose-400/[0.08] p-5">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-rose-100/80">
+                  Eye contact score
+                </p>
+                <p className="mt-3 text-2xl font-semibold text-white">
+                  {roomMetrics.eyeContactScore.toFixed(1)}
+                  <span className="text-base text-slate-400">/10</span>
+                </p>
+                <p className="mt-3 text-sm leading-7 text-rose-50/80">
+                  {roomMetrics.lookAwayEvents} look-away events detected.
+                </p>
+              </section>
+
+              <section className="rounded-[24px] border border-orange-300/15 bg-orange-400/[0.08] p-5">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-orange-100/80">
+                  Confidence score
+                </p>
+                <p className="mt-3 text-2xl font-semibold text-white">
+                  {brutalRuntime.analysis.confidenceScore}
+                  <span className="text-base text-slate-400">/10</span>
+                </p>
+                <p className="mt-3 text-sm leading-7 text-orange-50/80">
+                  {brutalRuntime.analysis.fillerCount} filler words detected.
+                </p>
+              </section>
+
+              <section className="rounded-[24px] border border-sky-300/15 bg-sky-300/[0.08] p-5">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-sky-100/80">
+                  Clarity score
+                </p>
+                <p className="mt-3 text-2xl font-semibold text-white">
+                  {clarityScore}
+                  <span className="text-base text-slate-400">/10</span>
+                </p>
+                <p className="mt-3 text-sm leading-7 text-sky-50/80">
+                  {roomMetrics.attentionMessage}
+                </p>
+              </section>
+            </div>
+          ) : null}
 
           <div className="grid gap-4 lg:grid-cols-2">
             <section className="rounded-[24px] border border-emerald-300/12 bg-emerald-300/[0.08] p-5">
