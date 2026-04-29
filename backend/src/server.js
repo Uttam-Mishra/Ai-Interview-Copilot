@@ -4,6 +4,11 @@ import { dirname, extname, join, normalize, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import dotenv from "dotenv";
 import { evaluateInterviewAnswer } from "./services/evaluation.service.js";
+import {
+  DEFAULT_INTERVIEW_MODE,
+  listInterviewModes,
+  normalizeInterviewMode,
+} from "./services/interviewModes/mode.constants.js";
 import { generateInterviewQuestions } from "./services/questions.service.js";
 import { extractResumeText } from "./services/resume.service.js";
 
@@ -158,8 +163,10 @@ const server = createServer(async (req, res) => {
     return sendJson(res, 200, {
       aiConfigured: Boolean(process.env.OPENAI_API_KEY),
       aiModel,
+      defaultMode: DEFAULT_INTERVIEW_MODE,
       status: "ok",
       service: "ai-interview-copilot-api",
+      supportedModes: listInterviewModes(),
       timestamp: new Date().toISOString(),
     });
   }
@@ -214,6 +221,7 @@ const server = createServer(async (req, res) => {
     try {
       const bodyBuffer = await collectRequestBody(req, maxJsonBodyBytes);
       const payload = JSON.parse(bodyBuffer.toString("utf8"));
+      const mode = normalizeInterviewMode(payload?.mode);
       const role = payload?.role?.trim();
       const resumeText = payload?.resumeText?.trim();
 
@@ -230,6 +238,7 @@ const server = createServer(async (req, res) => {
       }
 
       const result = await generateInterviewQuestions({
+        mode,
         role,
         resumeText,
       });
@@ -248,6 +257,7 @@ const server = createServer(async (req, res) => {
     try {
       const bodyBuffer = await collectRequestBody(req, maxJsonBodyBytes);
       const payload = JSON.parse(bodyBuffer.toString("utf8"));
+      const mode = normalizeInterviewMode(payload?.mode);
       const role = payload?.role?.trim();
       const resumeText = payload?.resumeText?.trim();
       const question = payload?.question?.trim();
@@ -278,10 +288,11 @@ const server = createServer(async (req, res) => {
       }
 
       const result = await evaluateInterviewAnswer({
-        role,
-        resumeText,
-        question,
         answer,
+        mode,
+        question,
+        resumeText,
+        role,
       });
 
       return sendJson(res, 200, result);

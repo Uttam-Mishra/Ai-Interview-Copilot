@@ -1,3 +1,5 @@
+import { normalizeInterviewMode } from "./interviewModes/mode.constants.js";
+import { getEvaluationInstructions } from "./interviewModes/promptTemplates.js";
 import { requestStructuredOutput } from "./openai.service.js";
 
 const MAX_RESUME_CONTEXT_CHARS = 8000;
@@ -47,10 +49,10 @@ function buildEvaluationInput({ role, resumeText, question, answer }) {
   ].join("\n");
 }
 
-export async function evaluateInterviewAnswer({ role, resumeText, question, answer }) {
+export async function evaluateInterviewAnswer({ answer, mode, question, resumeText, role }) {
+  const interviewMode = normalizeInterviewMode(mode);
   const { model, parsed } = await requestStructuredOutput({
-    instructions:
-      "You are an interview coach. Evaluate the candidate answer against the interview question, target role, and resume context. Score fairly on clarity, relevance, depth, and communication. Give concise, actionable strengths and weaknesses.",
+    instructions: getEvaluationInstructions(interviewMode),
     input: buildEvaluationInput({
       role,
       resumeText,
@@ -72,5 +74,6 @@ export async function evaluateInterviewAnswer({ role, resumeText, question, answ
   return {
     model,
     feedback: parsed,
+    mode: interviewMode,
   };
 }

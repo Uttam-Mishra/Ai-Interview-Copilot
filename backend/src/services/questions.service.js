@@ -1,3 +1,5 @@
+import { normalizeInterviewMode } from "./interviewModes/mode.constants.js";
+import { getQuestionGenerationInstructions } from "./interviewModes/promptTemplates.js";
 import { requestStructuredOutput } from "./openai.service.js";
 
 const questionResponseSchema = {
@@ -26,10 +28,10 @@ const questionResponseSchema = {
   required: ["questions"],
 };
 
-export async function generateInterviewQuestions({ role, resumeText }) {
+export async function generateInterviewQuestions({ mode, role, resumeText }) {
+  const interviewMode = normalizeInterviewMode(mode);
   const { model, parsed } = await requestStructuredOutput({
-    instructions:
-      "You are an interview coach. Generate practical interview questions tailored to the candidate's target role and resume. Avoid generic filler. Keep each focus label short and specific.",
+    instructions: getQuestionGenerationInstructions(interviewMode),
     input: `Target role: ${role}\n\nResume text:\n${resumeText}`,
     schema: questionResponseSchema,
     schemaName: "interview_questions",
@@ -41,6 +43,7 @@ export async function generateInterviewQuestions({ role, resumeText }) {
 
   return {
     model,
+    mode: interviewMode,
     questions: parsed.questions,
   };
 }

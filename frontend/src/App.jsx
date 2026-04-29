@@ -1,8 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import AnswerEvaluatorPanel from "./components/AnswerEvaluatorPanel";
+import InterviewModeSelector from "./components/InterviewModeSelector";
 import QuestionGeneratorPanel from "./components/QuestionGeneratorPanel";
 import ResumeUploadPanel from "./components/ResumeUploadPanel";
 import { ActionButton, StatusBadge, cn } from "./components/ui";
+import {
+  DEFAULT_INTERVIEW_MODE,
+  getInterviewModeOption,
+  isBrutalMode,
+  normalizeInterviewMode,
+} from "./lib/interviewModes";
 import { getHealth } from "./lib/api";
 
 const APP_STATE_STORAGE_KEY = "ai-interview-copilot-state";
@@ -97,6 +104,19 @@ export default function App() {
       return "";
     }
   });
+  const [interviewMode, setInterviewMode] = useState(() => {
+    if (typeof window === "undefined") {
+      return DEFAULT_INTERVIEW_MODE;
+    }
+
+    try {
+      const storedState = window.localStorage.getItem(APP_STATE_STORAGE_KEY);
+      const parsedState = storedState ? JSON.parse(storedState) : null;
+      return normalizeInterviewMode(parsedState?.interviewMode);
+    } catch {
+      return DEFAULT_INTERVIEW_MODE;
+    }
+  });
   const [health, setHealth] = useState({
     aiConfigured: false,
     aiModel: "",
@@ -162,13 +182,14 @@ export default function App() {
 
     const nextState = {
       generatedQuestions,
+      interviewMode,
       resumeData,
       selectedQuestion,
       targetRole,
     };
 
     window.localStorage.setItem(APP_STATE_STORAGE_KEY, JSON.stringify(nextState));
-  }, [generatedQuestions, resumeData, selectedQuestion, targetRole]);
+  }, [generatedQuestions, interviewMode, resumeData, selectedQuestion, targetRole]);
 
   useEffect(() => {
     if (generatedQuestions.length === 0) {
@@ -193,6 +214,7 @@ export default function App() {
 
     const nextState = {
       generatedQuestions,
+      interviewMode,
       resumeData,
       selectedQuestion,
       targetRole,
@@ -200,6 +222,14 @@ export default function App() {
 
     window.localStorage.setItem(APP_STATE_STORAGE_KEY, JSON.stringify(nextState));
     window.open(`${window.location.pathname}?view=evaluator`, "_blank", "noopener,noreferrer");
+  }
+
+  function handleModeChange(nextMode) {
+    const normalizedMode = normalizeInterviewMode(nextMode);
+
+    setInterviewMode(normalizedMode);
+    setGeneratedQuestions([]);
+    setSelectedQuestion("");
   }
 
   function scrollToSection(section) {
@@ -232,6 +262,7 @@ export default function App() {
   }, [generatedQuestions]);
 
   const roleIsReady = targetRole.trim().length > 0;
+  const modeOption = getInterviewModeOption(interviewMode);
   const suggestedQuestion = generatedQuestions[0] ?? null;
   const currentStep = !resumeData
     ? "upload"
@@ -278,10 +309,13 @@ export default function App() {
           ? "Generate tailored questions for this role."
           : "Choose the role, then generate tailored questions.",
         detail:
-          "Use a specific role title so the first practice set feels relevant instead of generic.",
+          interviewMode === "brutal"
+            ? "Use a specific role title so Brutal Mode can generate a sharper, higher-pressure practice set."
+            : "Use a specific role title so the first practice set feels relevant instead of generic.",
         actionLabel: "Go to question generator",
         actionTarget: "questions",
         checklist: [
+          `Mode selected: ${modeOption.label}`,
           "Set a clear target role",
           "Generate five focused questions",
           "Start with the suggested first question",
@@ -293,16 +327,27 @@ export default function App() {
       eyebrow: "Step 3",
       title: "Practice the suggested question and get coaching feedback.",
       detail:
-        "Use one concrete example in your answer so the evaluator can score relevance, clarity, and impact.",
+        interviewMode === "brutal"
+          ? "Use one concrete example in your answer so the stricter evaluator has enough evidence to challenge weak claims."
+          : "Use one concrete example in your answer so the evaluator can score relevance, clarity, and impact.",
       actionLabel: "Go to answer evaluator",
       actionTarget: "evaluate",
       checklist: [
+        `Mode selected: ${modeOption.label}`,
         "Suggested first question is ready",
         "Answer using the STAR structure",
         "Review strengths, gaps, and next retry advice",
       ],
     };
-  }, [generatedQuestions.length, health.aiConfigured, resumeData, roleIsReady, suggestedQuestion]);
+  }, [
+    generatedQuestions.length,
+    health.aiConfigured,
+    interviewMode,
+    modeOption.label,
+    resumeData,
+    roleIsReady,
+    suggestedQuestion,
+  ]);
 
   const summaryTiles = [
     {
@@ -320,6 +365,14 @@ export default function App() {
         : "Set the hiring target before generating questions.",
       tone: roleIsReady ? "ready" : "idle",
       value: roleIsReady ? targetRole.trim() : "Not selected",
+    },
+    {
+      label: "Interview mode",
+      note: isBrutalMode(interviewMode)
+        ? "High-pressure track is armed before the interview starts."
+        : "Default coaching flow stays active and unchanged.",
+      tone: isBrutalMode(interviewMode) ? "locked" : "ready",
+      value: modeOption.label,
     },
     {
       label: "AI workflow",
@@ -405,6 +458,7 @@ export default function App() {
             aiConfigured={health.aiConfigured}
             aiModel={health.aiModel}
             isStandalone
+            mode={interviewMode}
             onQuestionChange={setSelectedQuestion}
             priority
             questions={generatedQuestions}
@@ -446,6 +500,9 @@ export default function App() {
 
             <div className="flex flex-wrap items-center gap-2">
               <StatusBadge tone="idle">React + Vite</StatusBadge>
+              <StatusBadge tone={isBrutalMode(interviewMode) ? "locked" : "ready"}>
+                {modeOption.shortLabel}
+              </StatusBadge>
               <StatusBadge tone={health.aiConfigured ? "ready" : "locked"}>
                 {health.aiConfigured ? "AI connected" : "Demo mode"}
               </StatusBadge>
@@ -566,7 +623,7 @@ export default function App() {
           </aside>
         </section>
 
-        <section className="grid gap-4 md:grid-cols-3">
+        <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           {summaryTiles.map((item) => (
             <article
               className={cn(
@@ -588,6 +645,8 @@ export default function App() {
           ))}
         </section>
 
+        <InterviewModeSelector mode={interviewMode} onModeChange={handleModeChange} />
+
         <section className="grid gap-6 xl:grid-cols-[minmax(0,1.25fr)_minmax(360px,0.9fr)]">
           <div className="space-y-6">
             <div ref={uploadSectionRef} className="scroll-mt-6">
@@ -607,6 +666,7 @@ export default function App() {
                 aiConfigured={health.aiConfigured}
                 aiModel={health.aiModel}
                 generatedQuestions={generatedQuestions}
+                mode={interviewMode}
                 onJumpToEvaluate={() => scrollToSection("evaluate")}
                 onQuestionSelect={setSelectedQuestion}
                 priority={currentStep === "questions" && health.aiConfigured}
@@ -662,6 +722,7 @@ export default function App() {
               <AnswerEvaluatorPanel
                 aiConfigured={health.aiConfigured}
                 aiModel={health.aiModel}
+                mode={interviewMode}
                 onQuestionChange={setSelectedQuestion}
                 onOpenInNewTab={handleOpenEvaluatorInNewTab}
                 priority={currentStep === "evaluate" && health.aiConfigured}

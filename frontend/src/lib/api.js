@@ -79,13 +79,14 @@ export async function uploadResume(fileOrPayload) {
   return parseApiResponse(response);
 }
 
-export async function generateQuestions({ role, resumeText }) {
+export async function generateQuestions({ mode, role, resumeText }) {
   const response = await fetch(`${API_BASE_URL}/api/questions/generate`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
+      mode,
       role,
       resumeText,
     }),
@@ -94,17 +95,18 @@ export async function generateQuestions({ role, resumeText }) {
   return parseApiResponse(response);
 }
 
-export async function evaluateAnswer({ role, resumeText, question, answer }) {
+export async function evaluateAnswer({ answer, mode, question, resumeText, role }) {
   const response = await fetch(`${API_BASE_URL}/api/answers/evaluate`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      role,
-      resumeText,
-      question,
       answer,
+      mode,
+      question,
+      resumeText,
+      role,
     }),
   });
 

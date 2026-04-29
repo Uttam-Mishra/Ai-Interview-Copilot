@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { generateQuestions } from "../lib/api";
+import { getInterviewModeOption, isBrutalMode } from "../lib/interviewModes";
 import {
   ActionButton,
   EmptyState,
@@ -14,6 +15,7 @@ export default function QuestionGeneratorPanel({
   aiConfigured,
   aiModel,
   generatedQuestions,
+  mode,
   onJumpToEvaluate,
   onQuestionsGenerated,
   onQuestionSelect,
@@ -58,6 +60,7 @@ export default function QuestionGeneratorPanel({
 
     try {
       const data = await generateQuestions({
+        mode,
         role: role.trim(),
         resumeText,
       });
@@ -83,6 +86,7 @@ export default function QuestionGeneratorPanel({
 
   const hasQuestions = generatedQuestions.length > 0;
   const hasRole = role.trim().length > 0;
+  const modeOption = getInterviewModeOption(mode);
   const suggestedQuestion = generatedQuestions[0] ?? null;
   const isDisabled = isGenerating || !resumeText || !aiConfigured;
   const status = hasQuestions
@@ -161,6 +165,9 @@ export default function QuestionGeneratorPanel({
         </div>
 
         <div className="flex flex-wrap items-center gap-2 text-sm text-slate-400">
+          <StatusBadge tone={isBrutalMode(mode) ? "locked" : "ready"}>
+            {modeOption.shortLabel}
+          </StatusBadge>
           <StatusBadge tone={resumeText ? "ready" : "idle"}>
             {resumeText ? "Resume context loaded" : "Resume required"}
           </StatusBadge>
@@ -175,6 +182,13 @@ export default function QuestionGeneratorPanel({
         <InfoBanner>
           Upload a resume first. Once context is available, this button becomes the next
           highest-value action in the flow.
+        </InfoBanner>
+      ) : null}
+
+      {isBrutalMode(mode) ? (
+        <InfoBanner tone="warning">
+          Brutal Mode is selected. This step already uses stricter prompt framing, while
+          countdown pressure, interruptions, and adaptive follow-ups land in the next step.
         </InfoBanner>
       ) : null}
 

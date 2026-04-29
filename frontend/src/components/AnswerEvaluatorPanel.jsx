@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { evaluateAnswer } from "../lib/api";
+import { getInterviewModeOption, isBrutalMode } from "../lib/interviewModes";
 import {
   ActionButton,
   EmptyState,
@@ -14,6 +15,7 @@ export default function AnswerEvaluatorPanel({
   aiConfigured,
   aiModel,
   isStandalone = false,
+  mode,
   onOpenInNewTab,
   onQuestionChange,
   priority = false,
@@ -68,10 +70,11 @@ export default function AnswerEvaluatorPanel({
 
     try {
       const data = await evaluateAnswer({
-        role,
-        resumeText,
-        question: selectedQuestion,
         answer: answer.trim(),
+        mode,
+        question: selectedQuestion,
+        resumeText,
+        role,
       });
 
       setFeedback(data.feedback);
@@ -87,6 +90,7 @@ export default function AnswerEvaluatorPanel({
 
   const hasQuestions = questions.length > 0;
   const currentQuestion = selectedQuestion ?? "";
+  const modeOption = getInterviewModeOption(mode);
   const isDisabled =
     isEvaluating || !resumeText || !role || !hasQuestions || !aiConfigured;
   const status = feedback
@@ -136,6 +140,13 @@ export default function AnswerEvaluatorPanel({
         <InfoBanner tone="warning">
           AI evaluation is currently disabled. Add <code>OPENAI_API_KEY</code> to the
           backend to enable this panel{aiModel ? ` with ${aiModel}` : ""}.
+        </InfoBanner>
+      ) : null}
+
+      {isBrutalMode(mode) ? (
+        <InfoBanner tone="warning">
+          Brutal Mode is selected. This evaluator now carries the mode flag safely, while
+          timers, no-retry rules, and deeper rejection reporting land in the next step.
         </InfoBanner>
       ) : null}
 
@@ -200,6 +211,9 @@ export default function AnswerEvaluatorPanel({
 
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex flex-wrap items-center gap-2 text-sm text-slate-400">
+            <StatusBadge tone={isBrutalMode(mode) ? "locked" : "ready"}>
+              {modeOption.shortLabel}
+            </StatusBadge>
             <StatusBadge tone={hasQuestions ? "ready" : "idle"}>
               {hasQuestions ? "Question selected" : "Question pending"}
             </StatusBadge>
