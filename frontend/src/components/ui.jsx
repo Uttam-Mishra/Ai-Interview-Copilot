@@ -146,3 +146,24 @@ export function InfoBanner({ children, tone = "neutral" }) {
     </div>
   );
 }
+
+export function ModalFrame({ children, className, open }) {
+  if (!open) {
+    return null;
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center px-4 py-8">
+      <div className="absolute inset-0 bg-slate-950/72 backdrop-blur-md" />
+      <div
+        className={cn(
+          "mode-modal-shake relative w-full max-w-xl overflow-hidden rounded-[30px] border border-white/10 bg-[linear-gradient(180deg,rgba(15,23,42,0.98),rgba(10,14,25,0.98))] p-6 shadow-[0_30px_120px_rgba(2,6,23,0.7)] sm:p-7",
+          className,
+        )}
+      >
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/25 to-transparent" />
+        {children}
+      </div>
+    </div>
+  );
+}

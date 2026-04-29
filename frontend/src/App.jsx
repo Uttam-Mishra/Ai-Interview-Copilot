@@ -623,6 +623,8 @@ export default function App() {
           </aside>
         </section>
 
+        <InterviewModeSelector mode={interviewMode} onModeChange={handleModeChange} />
+
         <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           {summaryTiles.map((item) => (
             <article
@@ -644,8 +646,6 @@ export default function App() {
             </article>
           ))}
         </section>
-
-        <InterviewModeSelector mode={interviewMode} onModeChange={handleModeChange} />
 
         <section className="grid gap-6 xl:grid-cols-[minmax(0,1.25fr)_minmax(360px,0.9fr)]">
           <div className="space-y-6">

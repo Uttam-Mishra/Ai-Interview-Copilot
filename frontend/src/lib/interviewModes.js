@@ -7,13 +7,13 @@ export const DEFAULT_INTERVIEW_MODE = INTERVIEW_MODES.NORMAL;
 
 export const INTERVIEW_MODE_OPTIONS = [
   {
-    description: "Keeps the current friendly interview workflow unchanged.",
+    description: "Practice interviews with guided feedback.",
     key: INTERVIEW_MODES.NORMAL,
     label: "Normal Mode",
     shortLabel: "Normal",
   },
   {
-    description: "Arms the high-pressure track for stricter prompts and upcoming pressure mechanics.",
+    description: "High-pressure real interview simulation.",
     key: INTERVIEW_MODES.BRUTAL,
     label: "Brutal Mode",
     shortLabel: "Brutal Mode 🔥",
