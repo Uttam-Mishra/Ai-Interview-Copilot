@@ -191,6 +191,7 @@ export default function AnswerEvaluatorPanel({
         <VirtualInterviewRoom
           analysis={brutalRuntime.analysis}
           enabled={brutalModeActive && hasQuestions}
+          isListening={brutalRuntime.isListening}
           lastInterruption={brutalRuntime.lastInterruption}
           onMetricsChange={setRoomMetrics}
         />
