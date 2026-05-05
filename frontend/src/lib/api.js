@@ -112,3 +112,31 @@ export async function evaluateAnswer({ answer, mode, question, resumeText, role 
 
   return parseApiResponse(response);
 }
+
+export async function generateBrutalFollowUp({
+  activeAgentId,
+  answer,
+  behaviorSnapshot,
+  mode,
+  pressureSnapshot,
+  question,
+  role,
+}) {
+  const response = await fetch(`${API_BASE_URL}/api/brutal/follow-up`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      activeAgentId,
+      answer,
+      behaviorSnapshot,
+      mode,
+      pressureSnapshot,
+      question,
+      role,
+    }),
+  });
+
+  return parseApiResponse(response);
+}

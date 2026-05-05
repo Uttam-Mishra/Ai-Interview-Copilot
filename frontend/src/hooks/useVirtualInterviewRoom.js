@@ -9,7 +9,13 @@ import {
   getActivePanelInterviewer,
 } from "../services/brutalMode/panelInterviewers";
 
-export function useVirtualInterviewRoom({ analysis, enabled, lastInterruption }) {
+export function useVirtualInterviewRoom({
+  analysis,
+  behaviorSnapshot,
+  enabled,
+  lastInterruption,
+  pressureSnapshot,
+}) {
   const videoRef = useRef(null);
   const streamRef = useRef(null);
   const [attentionMessage, setAttentionMessage] = useState("Camera is off.");
@@ -19,8 +25,14 @@ export function useVirtualInterviewRoom({ analysis, enabled, lastInterruption })
   const [lookAwayEvents, setLookAwayEvents] = useState(0);
   const faceDetectionSupported = isNativeFaceDetectionSupported();
   const activeInterviewer = useMemo(
-    () => getActivePanelInterviewer({ analysis, lastInterruption }),
-    [analysis, lastInterruption],
+    () =>
+      getActivePanelInterviewer({
+        analysis,
+        behaviorSnapshot,
+        lastInterruption,
+        pressureSnapshot,
+      }),
+    [analysis, behaviorSnapshot, lastInterruption, pressureSnapshot],
   );
 
   useEffect(() => {

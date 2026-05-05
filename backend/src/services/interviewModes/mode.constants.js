@@ -13,7 +13,7 @@ const MODE_METADATA = {
     warning: "",
   },
   [INTERVIEW_MODES.BRUTAL]: {
-    description: "High-pressure interview track with stricter prompts and future pressure mechanics.",
+    description: "High-pressure interview track with pressure, behavior, and multi-agent simulation.",
     key: INTERVIEW_MODES.BRUTAL,
     label: "Brutal Mode",
     warning: "This mode simulates high-pressure interviews. No retries allowed.",

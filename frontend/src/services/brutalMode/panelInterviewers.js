@@ -1,39 +1,20 @@
-export const PANEL_INTERVIEWERS = [
-  {
-    accent: "emerald",
-    id: "hr",
-    name: "Maya",
-    prompt: "Give me a direct example. What was your responsibility?",
-    role: "HR",
-  },
-  {
-    accent: "sky",
-    id: "technical",
-    name: "Arjun",
-    prompt: "Walk me through the technical tradeoff. Why was this the right approach?",
-    role: "Technical",
-  },
-  {
-    accent: "rose",
-    id: "strict",
-    name: "Vikram",
-    prompt: "That answer sounds rehearsed. Prove it with details.",
-    role: "Strict",
-  },
-];
+import { INTERVIEW_AGENTS, getAgentById, selectActiveAgent } from "./multiAgentSystem";
 
-export function getActivePanelInterviewer({ analysis, lastInterruption }) {
+export const PANEL_INTERVIEWERS = INTERVIEW_AGENTS;
+
+export function getActivePanelInterviewer({
+  analysis,
+  behaviorSnapshot,
+  lastInterruption,
+  pressureSnapshot,
+}) {
   if (lastInterruption) {
-    return PANEL_INTERVIEWERS[2];
+    return getAgentById(lastInterruption.agentId ?? "strict");
   }
 
-  if (analysis.wordCount > 120) {
-    return PANEL_INTERVIEWERS[1];
-  }
-
-  if (analysis.confidenceScore <= 6) {
-    return PANEL_INTERVIEWERS[0];
-  }
-
-  return PANEL_INTERVIEWERS[1];
+  return selectActiveAgent({
+    behaviorSnapshot,
+    pressureSnapshot,
+    responseAnalysis: analysis,
+  });
 }

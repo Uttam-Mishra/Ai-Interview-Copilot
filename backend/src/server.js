@@ -4,6 +4,7 @@ import { dirname, extname, join, normalize, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import dotenv from "dotenv";
 import { evaluateInterviewAnswer } from "./services/evaluation.service.js";
+import { generateBrutalFollowUp } from "./services/brutalMode/followup.service.js";
 import {
   DEFAULT_INTERVIEW_MODE,
   listInterviewModes,
@@ -301,6 +302,45 @@ const server = createServer(async (req, res) => {
 
       return sendJson(res, 500, {
         error: error.message || "Failed to evaluate interview answer.",
+      });
+    }
+  }
+
+  if (req.method === "POST" && req.url === "/api/brutal/follow-up") {
+    try {
+      const bodyBuffer = await collectRequestBody(req, maxJsonBodyBytes);
+      const payload = JSON.parse(bodyBuffer.toString("utf8"));
+      const role = payload?.role?.trim();
+      const question = payload?.question?.trim();
+
+      if (!role) {
+        return sendJson(res, 400, {
+          error: "Please enter the target role.",
+        });
+      }
+
+      if (!question) {
+        return sendJson(res, 400, {
+          error: "A current interview question is required.",
+        });
+      }
+
+      const result = await generateBrutalFollowUp({
+        activeAgentId: payload?.activeAgentId ?? "strict",
+        answer: payload?.answer?.trim() ?? "",
+        behaviorSnapshot: payload?.behaviorSnapshot ?? {},
+        mode: payload?.mode,
+        pressureSnapshot: payload?.pressureSnapshot ?? {},
+        question,
+        role,
+      });
+
+      return sendJson(res, 200, result);
+    } catch (error) {
+      console.error(error);
+
+      return sendJson(res, 500, {
+        error: error.message || "Failed to generate Brutal Mode follow-up.",
       });
     }
   }

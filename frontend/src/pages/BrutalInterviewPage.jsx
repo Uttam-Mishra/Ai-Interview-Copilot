@@ -1,10 +1,13 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { useBrutalInterviewRuntime } from "../hooks/useBrutalInterviewRuntime";
 import { useVirtualInterviewRoom } from "../hooks/useVirtualInterviewRoom";
+import { generateBrutalFollowUp } from "../lib/api";
 import { readStoredAppState } from "../lib/appState";
+import { INTERVIEW_MODES } from "../lib/interviewModes";
 import { cancelSpeech, isTextToSpeechSupported, speakText } from "../services/ttsService";
+import { generateNoMercyReport } from "../services/brutalMode/evaluationService";
 import { formatTimer, getTimerTone } from "../services/brutalMode/pressureEngine";
 import { StatusBadge, cn } from "../components/ui";
 
@@ -47,7 +50,14 @@ function getStoredInterviewContext() {
   };
 }
 
-function buildLiveAlerts({ analysis, attentionMessage, lastInterruption, lookAwayEvents }) {
+function buildLiveAlerts({
+  analysis,
+  attentionMessage,
+  behaviorSnapshot,
+  lastInterruption,
+  lookAwayEvents,
+  pressureSnapshot,
+}) {
   const alerts = [];
 
   if (lastInterruption?.message) {
@@ -70,6 +80,14 @@ function buildLiveAlerts({ analysis, attentionMessage, lastInterruption, lookAwa
     alerts.push("Low confidence");
   }
 
+  if (pressureSnapshot?.level === "critical") {
+    alerts.push("Pressure rising");
+  }
+
+  for (const signal of behaviorSnapshot?.signals ?? []) {
+    alerts.push(signal.message);
+  }
+
   if (alerts.length === 0 && attentionMessage) {
     alerts.push(attentionMessage);
   }
@@ -83,67 +101,6 @@ function getInterviewerStatus({ activeInterviewer, interviewer, isListening }) {
   }
 
   return isListening ? "Listening" : "Thinking";
-}
-
-function getClarityScore(analysis) {
-  return Math.max(
-    1,
-    Math.min(
-      10,
-      10 -
-        (analysis.fillerCount >= 3 ? 2 : 0) -
-        (analysis.wordCount > 0 && analysis.wordCount < 35 ? 2 : 0) -
-        (analysis.wordCount > 180 ? 2 : 0),
-    ),
-  );
-}
-
-function buildReport({ analysis, answer, eyeContactScore, lookAwayEvents, role }) {
-  const clarityScore = getClarityScore(analysis);
-  const overallScore = Math.max(
-    1,
-    Math.min(10, Math.round((analysis.confidenceScore + clarityScore + eyeContactScore) / 3)),
-  );
-  const criticalMistakes = [];
-
-  if (analysis.wordCount < 35) {
-    criticalMistakes.push("Answer was too short to prove real ownership.");
-  }
-
-  if (analysis.wordCount > 180) {
-    criticalMistakes.push("Answer drifted instead of staying sharp and direct.");
-  }
-
-  if (analysis.fillerCount >= 3) {
-    criticalMistakes.push("Too many filler words reduced confidence.");
-  }
-
-  if (lookAwayEvents > 0) {
-    criticalMistakes.push("Eye contact broke during the answer.");
-  }
-
-  if (criticalMistakes.length === 0) {
-    criticalMistakes.push("The answer was stable, but still needs stronger measurable impact.");
-  }
-
-  return {
-    criticalMistakes,
-    improvements: [
-      "Open with the situation in one sentence.",
-      "Prove your exact responsibility, not just the team outcome.",
-      "Close with a measurable result or business impact.",
-    ],
-    overallScore,
-    rejectionReason:
-      answer.trim().length === 0
-        ? "No answer was captured, so the interviewer has no evidence to evaluate."
-        : `For a ${role || "target"} role, this answer needs clearer depth, proof, and confidence before it feels final-round ready.`,
-    weakAreas: [
-      `Confidence score: ${analysis.confidenceScore}/10`,
-      `Clarity score: ${clarityScore}/10`,
-      `Eye contact score: ${eyeContactScore.toFixed(1)}/10`,
-    ],
-  };
 }
 
 function InterviewerCard({ activeInterviewer, interviewer, isListening }) {
@@ -211,13 +168,20 @@ function MetricCard({ label, value, detail, tone = "rose" }) {
   );
 }
 
-function NoMercyReport({ analysis, answer, eyeContactScore, lookAwayEvents, onRestart, role }) {
+function NoMercyReport({
+  answer,
+  behaviorSnapshot,
+  onRestart,
+  pressureSnapshot,
+  responseAnalysis,
+  role,
+}) {
   const navigate = useNavigate();
-  const report = buildReport({
-    analysis,
+  const report = generateNoMercyReport({
     answer,
-    eyeContactScore,
-    lookAwayEvents,
+    behaviorSnapshot,
+    pressureSnapshot,
+    responseAnalysis,
     role,
   });
 
@@ -243,19 +207,19 @@ function NoMercyReport({ analysis, answer, eyeContactScore, lookAwayEvents, onRe
             detail="Combined confidence, clarity, and camera presence."
             label="Final score"
             tone="rose"
-            value={`${report.overallScore}/10`}
+            value={`${report.finalScore}/10`}
           />
           <MetricCard
-            detail={`${analysis.fillerCount} filler words detected.`}
-            label="Confidence"
+            detail={`${responseAnalysis.fillerCount} filler words detected.`}
+            label="Hesitation"
             tone="sky"
-            value={`${analysis.confidenceScore}/10`}
+            value={`${report.scoreBreakdown.hesitation}/10`}
           />
           <MetricCard
-            detail={`${lookAwayEvents} look-away events captured.`}
+            detail={`${pressureSnapshot.pressureScore}/100 pressure score.`}
             label="Eye contact"
             tone="emerald"
-            value={`${eyeContactScore.toFixed(1)}/10`}
+            value={`${report.scoreBreakdown.eyeContact}/10`}
           />
         </div>
 
@@ -275,7 +239,7 @@ function NoMercyReport({ analysis, answer, eyeContactScore, lookAwayEvents, onRe
           <section className="rounded-[24px] border border-amber-300/15 bg-amber-400/[0.08] p-5">
             <h2 className="text-base font-semibold text-white">Weak areas</h2>
             <ul className="mt-4 space-y-3 text-sm leading-7 text-amber-50/85">
-              {report.weakAreas.map((item) => (
+              {report.missedOpportunities.map((item) => (
                 <li className="flex gap-3" key={item}>
                   <span className="mt-2 h-2 w-2 rounded-full bg-amber-300" />
                   <span>{item}</span>
@@ -326,8 +290,14 @@ function NoMercyReport({ analysis, answer, eyeContactScore, lookAwayEvents, onRe
 
 export default function BrutalInterviewPage() {
   const context = useMemo(getStoredInterviewContext, []);
+  const requestedFollowUpKeyRef = useRef("");
   const [answer, setAnswer] = useState("");
+  const [aiFollowUp, setAiFollowUp] = useState(null);
   const [isReportOpen, setIsReportOpen] = useState(false);
+  const [visualMetrics, setVisualMetrics] = useState({
+    eyeContactScore: 10,
+    lookAwayEvents: 0,
+  });
   const roomEnabled = !isReportOpen;
   const runtime = useBrutalInterviewRuntime({
     answer,
@@ -338,28 +308,97 @@ export default function BrutalInterviewPage() {
         return `${currentAnswer}${separator}${transcript}`.trimStart();
       });
     },
+    role: context.role,
     selectedQuestion: context.question,
+    visualMetrics,
   });
   const room = useVirtualInterviewRoom({
     analysis: runtime.analysis,
+    behaviorSnapshot: runtime.behaviorSnapshot,
     enabled: roomEnabled,
     lastInterruption: runtime.lastInterruption,
+    pressureSnapshot: runtime.pressureSnapshot,
   });
+  const activeInterviewer = runtime.activeAgent ?? room.activeInterviewer;
   const timerTone = getTimerTone(runtime.timeRemaining);
   const ttsSupported = isTextToSpeechSupported();
   const liveAlerts = buildLiveAlerts({
     analysis: runtime.analysis,
     attentionMessage: room.attentionMessage,
+    behaviorSnapshot: runtime.behaviorSnapshot,
     lastInterruption: runtime.lastInterruption,
     lookAwayEvents: room.lookAwayEvents,
+    pressureSnapshot: runtime.pressureSnapshot,
   });
+  const displayedFollowUp = aiFollowUp?.followUpQuestion ?? runtime.agentTurn.followUpQuestion;
+
+  useEffect(() => {
+    setVisualMetrics({
+      eyeContactScore: room.eyeContactScore,
+      lookAwayEvents: room.lookAwayEvents,
+    });
+  }, [room.eyeContactScore, room.lookAwayEvents]);
+
+  useEffect(() => {
+    if (!roomEnabled || !context.role || runtime.analysis.wordCount < 20) {
+      return undefined;
+    }
+
+    const followUpBucket = Math.floor(runtime.analysis.wordCount / 50);
+    const requestKey = [
+      activeInterviewer.id,
+      runtime.pressureSnapshot.strategy,
+      runtime.pressureSnapshot.level,
+      followUpBucket,
+    ].join(":");
+
+    if (requestedFollowUpKeyRef.current === requestKey) {
+      return undefined;
+    }
+
+    const timeoutId = window.setTimeout(async () => {
+      requestedFollowUpKeyRef.current = requestKey;
+
+      try {
+        const data = await generateBrutalFollowUp({
+          activeAgentId: activeInterviewer.id,
+          answer,
+          behaviorSnapshot: runtime.behaviorSnapshot,
+          mode: INTERVIEW_MODES.BRUTAL,
+          pressureSnapshot: runtime.pressureSnapshot,
+          question: context.question,
+          role: context.role,
+        });
+
+        setAiFollowUp(data.followUp);
+      } catch {
+        setAiFollowUp(null);
+      }
+    }, 900);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [
+    activeInterviewer.id,
+    answer,
+    context.question,
+    context.role,
+    roomEnabled,
+    runtime.analysis.wordCount,
+    runtime.behaviorSnapshot,
+    runtime.pressureSnapshot,
+  ]);
 
   function speakPrompt() {
-    const prompt = runtime.lastInterruption?.message ?? room.activeInterviewer.prompt;
+    const prompt =
+      aiFollowUp?.interruption ??
+      runtime.lastInterruption?.message ??
+      aiFollowUp?.followUpQuestion ??
+      runtime.agentTurn.followUpQuestion ??
+      activeInterviewer.prompt;
 
     speakText(prompt, {
-      pitch: room.activeInterviewer.id === "strict" ? 0.74 : 0.9,
-      rate: room.activeInterviewer.id === "strict" ? 0.9 : 0.96,
+      pitch: activeInterviewer.id === "strict" ? 0.74 : 0.9,
+      rate: activeInterviewer.id === "strict" ? 0.9 : 0.96,
     });
   }
 
@@ -372,6 +411,12 @@ export default function BrutalInterviewPage() {
 
   function handleRestartInterview() {
     setAnswer("");
+    setAiFollowUp(null);
+    requestedFollowUpKeyRef.current = "";
+    setVisualMetrics({
+      eyeContactScore: 10,
+      lookAwayEvents: 0,
+    });
     setIsReportOpen(false);
   }
 
@@ -422,10 +467,10 @@ export default function BrutalInterviewPage() {
 
         {isReportOpen ? (
           <NoMercyReport
-            analysis={runtime.analysis}
             answer={answer}
-            eyeContactScore={room.eyeContactScore}
-            lookAwayEvents={room.lookAwayEvents}
+            behaviorSnapshot={runtime.behaviorSnapshot}
+            pressureSnapshot={runtime.pressureSnapshot}
+            responseAnalysis={runtime.analysis}
             role={context.role}
             onRestart={handleRestartInterview}
           />
@@ -448,7 +493,7 @@ export default function BrutalInterviewPage() {
                 <div className="space-y-3">
                   {room.interviewers.map((interviewer) => (
                     <InterviewerCard
-                      activeInterviewer={room.activeInterviewer}
+                      activeInterviewer={activeInterviewer}
                       interviewer={interviewer}
                       isListening={runtime.isListening}
                       key={interviewer.id}
@@ -511,20 +556,20 @@ export default function BrutalInterviewPage() {
                   <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
                     <div className="flex min-w-0 items-center gap-4">
                       <div className="relative flex h-14 w-14 shrink-0 items-center justify-center rounded-full border border-white/15 bg-white/[0.08] text-base font-semibold">
-                        {room.activeInterviewer.name.slice(0, 1)}
+                        {activeInterviewer.name.slice(0, 1)}
                         <span className="absolute -right-0.5 -top-0.5 h-4 w-4 rounded-full border-2 border-black bg-rose-300 shadow-[0_0_22px_rgba(251,113,133,0.7)]" />
                       </div>
                       <div className="min-w-0">
                         <p className="truncate text-lg font-semibold text-white">
-                          {room.activeInterviewer.name}
+                          {activeInterviewer.name}
                         </p>
                         <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-rose-100/75">
-                          {room.activeInterviewer.role} interviewer speaking
+                          {activeInterviewer.role} interviewer speaking
                         </p>
                       </div>
                     </div>
                     <p className="max-w-xl text-sm leading-7 text-slate-200">
-                      {runtime.lastInterruption?.message ?? room.activeInterviewer.prompt}
+                      {runtime.lastInterruption?.message ?? displayedFollowUp}
                     </p>
                   </div>
                 </div>
@@ -556,7 +601,35 @@ export default function BrutalInterviewPage() {
                     tone="emerald"
                     value={`${room.eyeContactScore.toFixed(1)}/10`}
                   />
+                  <MetricCard
+                    detail={`${runtime.pressureSnapshot.level} pressure level`}
+                    label="Pressure"
+                    tone="rose"
+                    value={`${runtime.pressureSnapshot.pressureScore}/100`}
+                  />
                 </div>
+
+                <section className="rounded-[24px] border border-white/10 bg-black/25 p-4">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-slate-500">
+                    Adaptive follow-up
+                  </p>
+                  <p className="mt-3 text-sm font-semibold leading-7 text-white">
+                    {displayedFollowUp}
+                  </p>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <span className="rounded-full border border-white/10 bg-white/[0.05] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-300">
+                      {runtime.pressureSnapshot.strategy}
+                    </span>
+                    <span className="rounded-full border border-white/10 bg-white/[0.05] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-300">
+                      {runtime.behaviorSnapshot.compositeScore}/10 behavior
+                    </span>
+                    {aiFollowUp ? (
+                      <span className="rounded-full border border-sky-300/20 bg-sky-300/10 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-sky-50">
+                        AI follow-up
+                      </span>
+                    ) : null}
+                  </div>
+                </section>
 
                 <label className="min-h-0 flex-1 rounded-[24px] border border-white/10 bg-black/25 p-4">
                   <span className="text-[11px] font-semibold uppercase tracking-[0.28em] text-slate-500">
@@ -600,6 +673,14 @@ export default function BrutalInterviewPage() {
                     {room.cameraError}
                   </span>
                 ) : null}
+                {runtime.pressureSnapshot.events.slice(0, 2).map((event) => (
+                  <span
+                    className="rounded-full border border-rose-300/20 bg-rose-400/10 px-4 py-2 text-sm font-semibold text-rose-50"
+                    key={event.id}
+                  >
+                    {event.label}
+                  </span>
+                ))}
               </div>
 
               <div className="flex flex-wrap gap-2">
